@@ -1,18 +1,13 @@
-const express = require('express');
-const dotenv = require('dotenv');
-dotenv.config();  // Load env variables
-
+const express = require("express");
 const app = express();
-const sendDropdown = require('./controllers/sendDropdown');
-
 app.use(express.json());
 
-// Route
-app.post('/sendlist', sendDropdown);
-
-app.get('/', (req, res) => {
-  res.send('Server is running. Use POST /sendlist to trigger WhatsApp message.');
+// Define the /sendlist POST route
+app.post("/sendlist", (req, res) => {
+  res.json({ message: "Dropdown sent!" });
 });
 
-// Start server
-app.listen(4000, () => console.log('Server running on port 4000'));
+// Start the server
+app.listen(4000, () => {
+  console.log("Server running on port 4000");
+});
