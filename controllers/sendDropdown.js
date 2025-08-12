@@ -54,7 +54,6 @@ function isRequestSignatureValid(req) {
 
   return crypto.timingSafeEqual(digest, signatureBuffer);
 }
-
 const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
@@ -71,20 +70,32 @@ const flowWebhook = async (req, res) => {
 
     console.log("Decrypted Body:", decryptedBody);
 
-    // Handle actions here
     let response;
 
     if (decryptedBody.action === "INIT") {
-     return {
+      response = {
         ...SCREEN_RESPONSES.Flight_Booking,
-        data:{
-        ...SCREEN_RESPONSES.Flight_Booking.data
+        data: {
+          ...SCREEN_RESPONSES.Flight_Booking.data
         }
-     }
+      };
 
-    } else if (decryptedBody.action === "data_exchange" && decryptedBody.screen === "FLIGHT_BOOKING_SCREEN") {
-      response = SCREEN_RESPONSES.SUMMARY;
-
+    } else if (
+      decryptedBody.action === "data_exchange" &&
+      decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
+    ) {
+      switch (decryptedBody.screen) {
+        case "FLIGHT_BOOKING_SCREEN":
+          response = {
+            ...SCREEN_RESPONSES.Summary,
+            data: {
+              ...SCREEN_RESPONSES.Summary.data
+            }
+          };
+          break;
+        default:
+          response = { data: { message: "Unknown screen" } };
+      }
     } else {
       response = { data: { message: "No matching action" } };
     }
@@ -92,17 +103,17 @@ const flowWebhook = async (req, res) => {
     // Encrypt response before sending
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
     res.send(encryptedResponse);
-    
+
   } catch (error) {
     console.error("Error in flowWebhook:", error);
     if (error instanceof FlowEndpointException) {
       return res.status(error.statusCode).send();
     }
-   console.error("Error in flowWebhook:", error);
     return res.status(error.statusCode || 500).json({ error: error.message });
-
   }
 };
+
+
 
 module.exports = {
   flowWebhook,
