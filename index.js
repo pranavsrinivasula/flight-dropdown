@@ -1,18 +1,16 @@
+// server.js
 const express = require("express");
-const app = express();
-app.use(express.json());
+const bodyParser = require("body-parser");
+const flowRoutes = require("./Routes/routes");
 
-// Define the /sendlist POST route
-app.get("/", (req, res) => {
-  res.json({
-    options: [
-      { value: "flight_1", label: "Hyderabad to Delhi" },
-      { value: "flight_2", label: "Hyderabad to Mumbai" },
-      { value: "flight_3", label: "Chennai to Bangalore" }
-    ]
-  });
-});
-// Start the server
-app.listen(4000, () => {
-  console.log("Server running on port 4000");
+const app = express();
+app.use(bodyParser.json());
+
+// Routes
+app.use("/", flowRoutes);
+
+// Start server
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
