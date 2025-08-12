@@ -63,13 +63,6 @@ const flowWebhook = async (req, res) => {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
-    // req.body is a Buffer; convert to UTF-8 string
-    // const rawBodyStr = req.body.toString("utf8");
-    // console.log("Raw Request Body:", rawBodyStr);
-
-    // Parse JSON payload
-    // const parsedBody = JSON.parse(rawBodyStr);
-
     // Decrypt payload using your decryptRequest function
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
       req.body,
@@ -79,10 +72,10 @@ const flowWebhook = async (req, res) => {
 
     console.log("Decrypted Body:", decryptedBody);
 
-    // let response;
+    let response;
 
     if (decryptedBody.action === "INIT") {
-      return {
+      response = {
         ...SCREEN_RESPONSES.Flight_Booking,
         data: { ...SCREEN_RESPONSES.Flight_Booking.data },
       };
@@ -90,29 +83,27 @@ const flowWebhook = async (req, res) => {
       decryptedBody.action === "data_exchange" &&
       decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
     ) {
-   return {
+      response = {
         ...SCREEN_RESPONSES.Summary,
         data: { ...SCREEN_RESPONSES.Summary.data },
       };
-
-    } 
-    else {
-      return { data: { message: "No matching action" } };
+    } else {
+      response = { data: { message: "No matching action" } };
     }
 
-
-    // // Encrypt response before sending back
+    // Encrypt response before sending back (uncomment if needed)
     // const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
-    // // Send back encrypted response as JSON and return to end function execution
-    // return res.json(encryptedResponse);
+    // Send back response (encrypted or plain)
+    // return res.json(encryptedResponse); // encrypted version
+    return res.json(response); // plain version
 
-    console.error("Unhandled request body:", decryptedBody);
   } catch (error) {
     console.error("Error in flowWebhook:", error);
     return res.status(error.statusCode || 400).json({ error: error.message || "Failed to decrypt request" });
   }
 };
+
 
 
 module.exports = {
