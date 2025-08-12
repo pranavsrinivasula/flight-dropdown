@@ -1,13 +1,10 @@
 const crypto = require("crypto");
 const fs = require("fs");
 
-let privateKeyPEM = process.env.PRIVATE_KEY;
-if (!privateKeyPEM && process.env.PRIVATE_KEY_PATH) {
-  privateKeyPEM = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
-}
-if (privateKeyPEM?.includes("\\n")) {
-  privateKeyPEM = privateKeyPEM.replace(/\\n/g, "\n");
-}
+require('dotenv').config();
+
+
+
 class FlowEndpointException extends Error {
   constructor(message, statusCode) {
     super(message);

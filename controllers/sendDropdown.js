@@ -1,15 +1,17 @@
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
+const fs = require("fs");
 const crypto = require("crypto"); 
+const path = require("path");
 require('dotenv').config();
-
+const privateKeyPath = process.env.PRIVATE_KEY_PATH;
+const PRIVATE_KEY = fs.readFileSync(path.resolve(privateKeyPath), "utf8");
 // const PRIVATE_KEY = process.env.PRIVATE_KEY_PATH;
 // const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
-const fs = require("fs");
 
-let PRIVATE_KEY = process.env.PRIVATE_KEY?.replace(/\\n/g, "\n"); // Inline key case
-if (!PRIVATE_KEY && process.env.PRIVATE_KEY_PATH) {
-  PRIVATE_KEY = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
-}
+// let PRIVATE_KEY = process.env.PRIVATE_KEY?.replace(/\\n/g, "\n"); // Inline key case
+// if (!PRIVATE_KEY && process.env.PRIVATE_KEY_PATH) {
+//   PRIVATE_KEY = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
+// }
 const { APP_SECRET,  PASSPHRASE = "" } = process.env;
 
 
