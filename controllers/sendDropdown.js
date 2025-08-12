@@ -63,21 +63,21 @@ const flowWebhook = async (req, res) => {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
-    // // req.body is a Buffer; convert to UTF-8 string
+    // req.body is a Buffer; convert to UTF-8 string
     // const rawBodyStr = req.body.toString("utf8");
     // console.log("Raw Request Body:", rawBodyStr);
 
-    // // Parse JSON payload
+    // Parse JSON payload
     // const parsedBody = JSON.parse(rawBodyStr);
 
-    // // Decrypt payload using your decryptRequest function
-    // const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
-    //   parsedBody,
-    //   PRIVATE_KEY,
-    //   PASSPHRASE
-    // );
+    // Decrypt payload using your decryptRequest function
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
+      req.body,
+      PRIVATE_KEY,
+      PASSPHRASE
+    );
 
-    // console.log("Decrypted Body:", decryptedBody);
+    console.log("Decrypted Body:", decryptedBody);
 
     // let response;
 
