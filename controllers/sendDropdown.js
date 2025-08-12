@@ -1,10 +1,7 @@
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 const fs = require("fs");
 const crypto = require("crypto"); 
-const path = require("path");
-require('dotenv').config();
-const privateKeyPath = process.env.PRIVATE_KEY_PATH;
-const PRIVATE_KEY = fs.readFileSync(path.resolve(privateKeyPath), "utf8");
+
 // const PRIVATE_KEY = process.env.PRIVATE_KEY_PATH;
 // const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
 
@@ -57,7 +54,10 @@ function isRequestSignatureValid(req) {
 
   return crypto.timingSafeEqual(digest, signatureBuffer);
 }
-
+const path = require("path");
+require('dotenv').config();
+const privateKeyPath = process.env.PRIVATE_KEY_PATH;
+const PRIVATE_KEY = fs.readFileSync(path.resolve(privateKeyPath), "utf8");
 const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
