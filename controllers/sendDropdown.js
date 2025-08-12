@@ -63,8 +63,12 @@ const flowWebhook = async (req, res) => {
 
     if (!isRequestSignatureValid(req)) return res.status(432).send();
 
+    // ✅ Parse the incoming encrypted payload
+    const rawBodyStr = req.body.toString('utf8');
+    const parsedBody = JSON.parse(rawBodyStr);
+
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
-      req.body,
+      parsedBody,
       PRIVATE_KEY,
       PASSPHRASE
     );
@@ -78,7 +82,6 @@ const flowWebhook = async (req, res) => {
         ...SCREEN_RESPONSES.Flight_Booking,
         data: { ...SCREEN_RESPONSES.Flight_Booking.data }
       };
-
     } else if (
       decryptedBody.action === "data_exchange" &&
       decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
@@ -87,12 +90,11 @@ const flowWebhook = async (req, res) => {
         ...SCREEN_RESPONSES.Summary,
         data: { ...SCREEN_RESPONSES.Summary.data }
       };
-
     } else {
       response = { data: { message: "No matching action" } };
     }
 
-    // ✅ Always encrypt before sending
+    // ✅ Encrypt before sending back
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
     res.send(encryptedResponse);
 
