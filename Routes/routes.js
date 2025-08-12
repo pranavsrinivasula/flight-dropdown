@@ -11,7 +11,7 @@ router.post("/flow-webhook", (req, res) => {
 
 
     if (action === "INIT") {
-        return res.json(SCREEN_RESPONSE.Flight_Booking);
+        return res.json(SCREEN_RESPONSE.Flight_Booking.data);
     }
 
     if (action === "data_exchange" && screen === "FLIGHT_BOOKING_SCREEN") {
