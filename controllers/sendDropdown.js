@@ -1,16 +1,11 @@
-const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
-const fs = require("fs");
-const crypto = require("crypto"); 
+const { decryptRequest, encryptResponse } = require("../middleware/encryption");
+const crypto = require("crypto");
+const { APP_SECRET, PASSPHRASE = "" } = process.env;  // get only these from env
 
-// const PRIVATE_KEY = process.env.PRIVATE_KEY_PATH;
-// const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
+const rawPrivateKey = process.env.PRIVATE_KEY;
+if (!rawPrivateKey) throw new Error("Private key missing");
 
-// let PRIVATE_KEY = process.env.PRIVATE_KEY?.replace(/\\n/g, "\n"); // Inline key case
-// if (!PRIVATE_KEY && process.env.PRIVATE_KEY_PATH) {
-//   PRIVATE_KEY = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
-// }
-const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "" } = process.env;
-
+const PRIVATE_KEY = rawPrivateKey.replace(/\\n/g, "\n");  // replace \n with real newlines
 
 
 const SCREEN_RESPONSES = {
@@ -39,6 +34,8 @@ const SCREEN_RESPONSES = {
     },
   },
 };
+
+// Validate signature (HMAC SHA256)
 function isRequestSignatureValid(req) {
   if (!APP_SECRET) {
     console.warn("App Secret missing. Skipping signature validation.");
@@ -51,7 +48,7 @@ function isRequestSignatureValid(req) {
   const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
   const hmac = crypto.createHmac("sha256", APP_SECRET);
 
-  // Use raw Buffer from express.raw()
+  // Use raw Buffer (req.body is Buffer)
   const digest = hmac.update(req.body).digest();
 
   return crypto.timingSafeEqual(digest, signatureBuffer);
@@ -61,12 +58,19 @@ const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
 
-    if (!isRequestSignatureValid(req)) return res.status(432).send();
+    // Validate signature before processing
+    if (!isRequestSignatureValid(req)) {
+      return res.status(401).json({ error: "Invalid signature" });
+    }
 
-    // ✅ Parse the incoming encrypted payload
-    const rawBodyStr = req.body.toString('utf8');
+    // req.body is a Buffer; convert to UTF-8 string
+    const rawBodyStr = req.body.toString("utf8");
+    console.log("Raw Request Body:", rawBodyStr);
+
+    // Parse JSON payload
     const parsedBody = JSON.parse(rawBodyStr);
 
+    // Decrypt payload using your decryptRequest function
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
       parsedBody,
       PRIVATE_KEY,
@@ -80,7 +84,7 @@ const flowWebhook = async (req, res) => {
     if (decryptedBody.action === "INIT") {
       response = {
         ...SCREEN_RESPONSES.Flight_Booking,
-        data: { ...SCREEN_RESPONSES.Flight_Booking.data }
+        data: { ...SCREEN_RESPONSES.Flight_Booking.data },
       };
     } else if (
       decryptedBody.action === "data_exchange" &&
@@ -88,24 +92,23 @@ const flowWebhook = async (req, res) => {
     ) {
       response = {
         ...SCREEN_RESPONSES.Summary,
-        data: { ...SCREEN_RESPONSES.Summary.data }
+        data: { ...SCREEN_RESPONSES.Summary.data },
       };
     } else {
       response = { data: { message: "No matching action" } };
     }
 
-    // ✅ Encrypt before sending back
+    // Encrypt response before sending back
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
-    res.send(encryptedResponse);
+
+    // Send back encrypted response as JSON
+    res.json(encryptedResponse);
 
   } catch (error) {
     console.error("Error in flowWebhook:", error);
-    return res.status(error.statusCode || 500).json({ error: error.message });
+    return res.status(error.statusCode || 400).json({ error: error.message || "Failed to decrypt request" });
   }
 };
-
-
-
 
 module.exports = {
   flowWebhook,
