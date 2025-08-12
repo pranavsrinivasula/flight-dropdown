@@ -61,10 +61,8 @@ const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
 
-    // Validate signature
     if (!isRequestSignatureValid(req)) return res.status(432).send();
 
-    // Decrypt request body
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
       req.body,
       PRIVATE_KEY,
@@ -78,47 +76,32 @@ const flowWebhook = async (req, res) => {
     if (decryptedBody.action === "INIT") {
       response = {
         ...SCREEN_RESPONSES.Flight_Booking,
-        data: {
-          ...SCREEN_RESPONSES.Flight_Booking.data
-        }
+        data: { ...SCREEN_RESPONSES.Flight_Booking.data }
       };
 
     } else if (
       decryptedBody.action === "data_exchange" &&
       decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
     ) {
-      switch (decryptedBody.screen) {
-        case "FLIGHT_BOOKING_SCREEN":
-          response = {
-            ...SCREEN_RESPONSES.Summary,
-            data: {
-              ...SCREEN_RESPONSES.Summary.data
-            }
-          };
-          break;
-        default:
-          response = { data: { message: "Unknown screen" } };
-      }
+      response = {
+        ...SCREEN_RESPONSES.Summary,
+        data: { ...SCREEN_RESPONSES.Summary.data }
+      };
+
     } else {
       response = { data: { message: "No matching action" } };
     }
 
-    // Encrypt response before sending
+    // ✅ Always encrypt before sending
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
     res.send(encryptedResponse);
 
   } catch (error) {
     console.error("Error in flowWebhook:", error);
-    if (error instanceof FlowEndpointException) {
-      return res.status(error.statusCode).send();
-    }
     return res.status(error.statusCode || 500).json({ error: error.message });
   }
-  console.log("Is buffer:", Buffer.isBuffer(req.body));
-console.log("Body length:", req.body?.length);
-console.log("First bytes:", req.body.toString("hex").slice(0, 50), "...");
-
 };
+
 
 
 
