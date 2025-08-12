@@ -82,7 +82,7 @@ const flowWebhook = async (req, res) => {
     let response;
 
     if (decryptedBody.action === "INIT") {
-      response = {
+      return {
         ...SCREEN_RESPONSES.Flight_Booking,
         data: { ...SCREEN_RESPONSES.Flight_Booking.data },
       };
@@ -90,20 +90,24 @@ const flowWebhook = async (req, res) => {
       decryptedBody.action === "data_exchange" &&
       decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
     ) {
-      response = {
+   return {
         ...SCREEN_RESPONSES.Summary,
         data: { ...SCREEN_RESPONSES.Summary.data },
       };
-    } else {
-      response = { data: { message: "No matching action" } };
+
+    } 
+    else {
+      return { data: { message: "No matching action" } };
     }
 
-    // Encrypt response before sending back
-    const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
-    // Send back encrypted response as JSON and return to end function execution
-    return res.json(encryptedResponse);
+    // // Encrypt response before sending back
+    // const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
+    // // Send back encrypted response as JSON and return to end function execution
+    // return res.json(encryptedResponse);
+
+    console.error("Unhandled request body:", decryptedBody);
   } catch (error) {
     console.error("Error in flowWebhook:", error);
     return res.status(error.statusCode || 400).json({ error: error.message || "Failed to decrypt request" });
