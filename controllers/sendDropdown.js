@@ -101,14 +101,15 @@ const flowWebhook = async (req, res) => {
     // Encrypt response before sending back
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
-    // Send back encrypted response as JSON
-    res.json(encryptedResponse);
+    // Send back encrypted response as JSON and return to end function execution
+    return res.json(encryptedResponse);
 
   } catch (error) {
     console.error("Error in flowWebhook:", error);
     return res.status(error.statusCode || 400).json({ error: error.message || "Failed to decrypt request" });
   }
 };
+
 
 module.exports = {
   flowWebhook,
