@@ -39,21 +39,24 @@ const SCREEN_RESPONSES = {
     },
   },
 };
-
 function isRequestSignatureValid(req) {
   if (!APP_SECRET) {
     console.warn("App Secret missing. Skipping signature validation.");
     return true;
   }
+
   const signatureHeader = req.get("x-hub-signature-256");
   if (!signatureHeader) return false;
 
   const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
   const hmac = crypto.createHmac("sha256", APP_SECRET);
-  const digest = hmac.update(req.rawBody || "").digest();
+
+  // Use raw Buffer from express.raw()
+  const digest = hmac.update(req.body).digest();
 
   return crypto.timingSafeEqual(digest, signatureBuffer);
 }
+
 const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
