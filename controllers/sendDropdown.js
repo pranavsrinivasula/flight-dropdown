@@ -111,6 +111,10 @@ const flowWebhook = async (req, res) => {
     }
     return res.status(error.statusCode || 500).json({ error: error.message });
   }
+  console.log("Is buffer:", Buffer.isBuffer(req.body));
+console.log("Body length:", req.body?.length);
+console.log("First bytes:", req.body.toString("hex").slice(0, 50), "...");
+
 };
 
 

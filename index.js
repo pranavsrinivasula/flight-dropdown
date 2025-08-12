@@ -1,19 +1,18 @@
+// index.js
 const express = require("express");
 const flowRoutes = require("./Routes/routes");
 const app = express();
 
+// ✅ Only /flow-webhook gets raw parser, no JSON parser after it
+app.use('/flow-webhook', express.raw({ type: '*/*' }), flowRoutes);
 
-
-
-// app.use(express.json({
-//   verify: (req, res, buf) => { req.rawBody = buf.toString(); }, // needed for signature verification
-// }));
-
-// app.use("/", flowRoutes);
-app.use('/flow-webhook', express.raw({ type: '*/*' }),flowRoutes);
-
-// Other parsers for normal routes
+// ✅ All other routes get JSON parser
 app.use(express.json());
+
+// Example other routes
+app.get("/", (req, res) => {
+  res.send("Hello World");
+});
 
 app.listen(3000, () => {
   console.log("Server running on port 3000");
