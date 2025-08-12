@@ -2,8 +2,11 @@ const express = require("express");
 const router = express.Router();
 
 const { flowWebhook } = require("../controllers/sendDropdown");
+const app = express();
 
-// router.post("/flow-webhook", flowWebhook);
-router.post("/flow-webhook", express.raw({ type: "*/*" }), flowWebhook);
+app.use('/flow-webhook', express.raw({ type: '*/*' }), flowRouter);
+
+// Other parsers for normal routes
+app.use(express.json());
 
 module.exports = router;

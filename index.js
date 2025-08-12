@@ -9,10 +9,7 @@ const app = express();
 //   verify: (req, res, buf) => { req.rawBody = buf.toString(); }, // needed for signature verification
 // }));
 
-app.use('/flow-webhook', express.raw({ type: '*/*' }), flowRouter);
-
-// Other parsers for normal routes
-app.use(express.json());
+app.use("/", flowRoutes);
 
 app.listen(3000, () => {
   console.log("Server running on port 3000");
