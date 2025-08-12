@@ -75,9 +75,16 @@ const flowWebhook = async (req, res) => {
     let response;
 
     if (decryptedBody.action === "INIT") {
-      response = SCREEN_RESPONSES.Flight_Booking;
+     return {
+        ...SCREEN_RESPONSES.Flight_Booking,
+        data:{
+        ...SCREEN_RESPONSES.Flight_Booking.data
+        }
+     }
+
     } else if (decryptedBody.action === "data_exchange" && decryptedBody.screen === "FLIGHT_BOOKING_SCREEN") {
       response = SCREEN_RESPONSES.SUMMARY;
+
     } else {
       response = { data: { message: "No matching action" } };
     }
