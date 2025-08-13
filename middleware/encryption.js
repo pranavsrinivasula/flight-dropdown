@@ -1,9 +1,4 @@
 const crypto = require("crypto");
-const fs = require("fs");
-
-require('dotenv').config();
-
-
 
 class FlowEndpointException extends Error {
   constructor(message, statusCode) {
@@ -13,25 +8,29 @@ class FlowEndpointException extends Error {
   }
 }
 
-/**
- * Decrypt incoming request from flow using private key and passphrase.
- * @param {Object} encryptedBody - The raw encrypted request body
- * @param {string} privateKeyPEM - Your private key PEM string
- * @param {string} passphrase - Private key passphrase (if any)
- * @returns {Object} - { aesKeyBuffer, initialVectorBuffer, decryptedBody }
- */
-function decryptRequest(encryptedBody, privateKeyPEM, passphrase) {
+const APP_SECRET = process.env.APP_SECRET;
+
+function isRequestSignatureValid(req) {
+  if (!APP_SECRET) return true;
+
+  const signatureHeader = req.get("x-hub-signature-256");
+  if (!signatureHeader) return false;
+
+  const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
+  const hmac = crypto.createHmac("sha256", APP_SECRET).update(req.body).digest();
+
+  return crypto.timingSafeEqual(hmac, signatureBuffer);
+}
+
+function decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE) {
   try {
     const { encrypted_initialisation_vector, encrypted_aes_key, encrypted_payload } = encryptedBody;
 
-    // Decrypt AES key using RSA private key
-    const privateKeyObject = crypto.createPrivateKey({ key: privateKeyPEM, passphrase });
-    const aesKeyBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_aes_key, "base64"));
+    const privateKeyObject = crypto.createPrivateKey({ key: PRIVATE_KEY, passphrase: PASSPHRASE });
 
-    // Decrypt IV using RSA private key
+    const aesKeyBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_aes_key, "base64"));
     const initialVectorBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_initialisation_vector, "base64"));
 
-    // Decrypt payload using AES key and IV
     const decipher = crypto.createDecipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
     let decryptedPayload = decipher.update(encrypted_payload, "base64", "utf-8");
     decryptedPayload += decipher.final("utf-8");
@@ -39,17 +38,11 @@ function decryptRequest(encryptedBody, privateKeyPEM, passphrase) {
     const decryptedBody = JSON.parse(decryptedPayload);
     return { aesKeyBuffer, initialVectorBuffer, decryptedBody };
   } catch (error) {
+    console.error("Decrypt error:", error);
     throw new FlowEndpointException("Failed to decrypt request", 400);
   }
 }
 
-/**
- * Encrypt response JSON to send back to flow.
- * @param {Object} responseBody - Plain JSON response to encrypt
- * @param {Buffer} aesKeyBuffer - AES key from decrypted request
- * @param {Buffer} initialVectorBuffer - IV from decrypted request
- * @returns {Object} - Encrypted response object
- */
 function encryptResponse(responseBody, aesKeyBuffer, initialVectorBuffer) {
   try {
     const cipher = crypto.createCipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
@@ -58,16 +51,14 @@ function encryptResponse(responseBody, aesKeyBuffer, initialVectorBuffer) {
 
     return { encrypted_payload: encrypted };
   } catch (error) {
+    console.error("Encrypt error:", error);
     throw new FlowEndpointException("Failed to encrypt response", 500);
   }
 }
 
-
-
 module.exports = {
   decryptRequest,
   encryptResponse,
+  isRequestSignatureValid,
   FlowEndpointException,
 };
-
-

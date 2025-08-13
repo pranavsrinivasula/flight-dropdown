@@ -35,24 +35,8 @@ const SCREEN_RESPONSES = {
   },
 };
 
-// Validate signature (HMAC SHA256)
-function isRequestSignatureValid(req) {
-  if (!APP_SECRET) {
-    console.warn("App Secret missing. Skipping signature validation.");
-    return true;
-  }
 
-  const signatureHeader = req.get("x-hub-signature-256");
-  if (!signatureHeader) return false;
 
-  const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
-  const hmac = crypto.createHmac("sha256", APP_SECRET);
-
-  // Use raw Buffer (req.body is Buffer)
-  const digest = hmac.update(req.body).digest();
-
-  return crypto.timingSafeEqual(digest, signatureBuffer);
-}
 
 const flowWebhook = async (req, res) => {
   try {
@@ -91,13 +75,11 @@ const flowWebhook = async (req, res) => {
       response = { data: { message: "No matching action" } };
     }
 
-    // Encrypt response before sending back (uncomment if needed)
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
-    // Send back response (encrypted or plain)
 
-    return res.json(encryptedResponse); // encrypted version
-    // return res.json(response); // plain version
+    return res.json(encryptedResponse) 
+    // return res.json(response); 
 
   } catch (error) {
     console.error("Error in flowWebhook:", error);
