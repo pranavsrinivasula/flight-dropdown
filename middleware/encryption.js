@@ -20,7 +20,7 @@ function isRequestSignatureValid(req) {
   if (!signatureHeader) return false;
 
   const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
-  const digest = crypto.createHmac("sha256", APP_SECRET).update(req.rawBody || req.body).digest();
+  const digest = crypto.createHmac("sha256", APP_SECRET).update(req.rawBody).digest();
 
   return crypto.timingSafeEqual(digest, signatureBuffer);
 }
