@@ -93,34 +93,40 @@ const flowWebhook = async (req, res) => {
     }
 
     // 3. If req.body is a buffer, parse it
-    let encryptedBody = req.body;
-    if (Buffer.isBuffer(encryptedBody)) {
-      encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
+    // let encryptedBody = req.body;
+    // if (Buffer.isBuffer(encryptedBody)) {
+    //   encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
+    // }
+
+ let decryptedRequest = null;
+    try {
+        decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+    } catch (err) {
+        console.error(err);
+        if (err instanceof FlowEndpointException) {
+            return res.status(err.statusCode).send();
+        }
+        return res.status(500).send();
     }
 
-    // 4. Decrypt request
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
-      encryptedBody,
-      PRIVATE_KEY,
-      PASSPHRASE
-    );
+
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest;
 
     console.log("Decrypted Body:", decryptedBody);
 
-    // 5. Process logic here (send dropdown, etc.)
-    const responseData = {
-      data: ["Option 1", "Option 2", "Option 3"]
-    };
+     const screenResponse = await getNextScreen(decryptedBody);
 
     // 6. Encrypt response before sending
-    const encryptedResponse = encryptResponse(
-      responseData,
-      aesKeyBuffer,
-      initialVectorBuffer
-    );
+    // const encryptedResponse = encryptResponse(
+    //   responseData,
+    //   aesKeyBuffer,
+    //   initialVectorBuffer
+    // );
 
-    res.json(encryptedResponse);
+    // res.json(encryptedResponse);
+    res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 
+  
   } catch (error) {
     console.error(error);
     const status = error.statusCode || 500;
