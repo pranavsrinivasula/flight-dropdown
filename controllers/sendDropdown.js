@@ -39,13 +39,12 @@ const getNextScreen = async (decryptedBody) => {
 
       case "SUMMARY_SCREEN":
         return {
-          screen: "SUCCESS",
+          screen: "SUCCESS",  
           data: {
             extension_message_response: {
               params: {
                 flow_token,
-                optional_param1: "value1",
-                optional_param2: "value2"
+  
               }
             }
           }
@@ -59,29 +58,61 @@ const getNextScreen = async (decryptedBody) => {
   throw new Error("Unhandled action in Flow webhook");
 };
 
+// const flowWebhook = async (req, res) => {
+//   try {
+//     if (!PRIVATE_KEY) throw new Error("Private key missing");
+
+//     if (!isRequestSignatureValid(req)) return res.status(432).send(); 
+
+//     let encryptedBody = req.body;
+//     if (Buffer.isBuffer(encryptedBody)) encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
+
+//     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE);
+
+//     console.log("Decrypted Body:", decryptedBody);
+
+//     const screenResponse = await getNextScreen(decryptedBody);
+
+//     const encryptedResponse = encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer);
+
+//     res.send(encryptedResponse);
+//   } catch (error) {
+//     console.error("Flow Webhook Error:", error);
+//     if (error instanceof FlowEndpointException) return res.status(error.statusCode).send();
+//     res.status(500).send();
+//   }
+// };
 const flowWebhook = async (req, res) => {
-  try {
-    if (!PRIVATE_KEY) throw new Error("Private key missing");
+    if (!PRIVATE_KEY) {
+        throw new Error(
+            'Private key is empty. Please check your env variable "PRIVATE_KEY".'
+        );
+    }
 
-    if (!isRequestSignatureValid(req)) return res.status(432).send(); // Signature mismatch
+    if (!isRequestSignatureValid(req)) {
+        // Return status code 432 if request signature does not match.
+        // To learn more about return error codes visit: https://developers.facebook.com/docs/whatsapp/flows/reference/error-codes#endpoint_error_codes
+        return res.status(432).send();
+    }
 
-    let encryptedBody = req.body;
-    if (Buffer.isBuffer(encryptedBody)) encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
+    let decryptedRequest = null;
+    try {
+        decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+    } catch (err) {
+        console.error(err);
+        if (err instanceof FlowEndpointException) {
+            return res.status(err.statusCode).send();
+        }
+        return res.status(500).send();
+    }
 
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE);
-
-    console.log("Decrypted Body:", decryptedBody);
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
+    console.log("💬 Decrypted Request:", decryptedBody);
 
     const screenResponse = await getNextScreen(decryptedBody);
+    console.log("👉 Response to Encrypt:", screenResponse);
 
-    const encryptedResponse = encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer);
-
-    res.send(encryptedResponse);
-  } catch (error) {
-    console.error("Flow Webhook Error:", error);
-    if (error instanceof FlowEndpointException) return res.status(error.statusCode).send();
-    res.status(500).send();
-  }
-};
+    res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
+}
 
 module.exports = { flowWebhook, getNextScreen };
