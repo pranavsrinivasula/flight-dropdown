@@ -92,7 +92,7 @@ const flowWebhook = async (req, res) => {
     }
 
     // Encrypt response before sending back (uncomment if needed)
-    // const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
+    const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
     // Send back response (encrypted or plain)
 
