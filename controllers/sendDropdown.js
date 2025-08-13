@@ -1,11 +1,11 @@
 const { decryptRequest, encryptResponse } = require("../middleware/encryption");
 const crypto = require("crypto");
-const { APP_SECRET, PASSPHRASE = "" } = process.env;  // get only these from env
+const { APP_SECRET, PASSPHRASE = "" } = process.env;  
 
 const rawPrivateKey = process.env.PRIVATE_KEY;
 if (!rawPrivateKey) throw new Error("Private key missing");
 
-const PRIVATE_KEY = rawPrivateKey.replace(/\\n/g, "\n");  // replace \n with real newlines
+const PRIVATE_KEY = rawPrivateKey.replace(/\\n/g, "\n");  
 
 
 const SCREEN_RESPONSES = {
@@ -95,8 +95,9 @@ const flowWebhook = async (req, res) => {
     // const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
 
     // Send back response (encrypted or plain)
-    // return res.json(encryptedResponse); // encrypted version
-    return res.json(response); // plain version
+
+    return res.json(encryptedResponse); // encrypted version
+    // return res.json(response); // plain version
 
   } catch (error) {
     console.error("Error in flowWebhook:", error);
