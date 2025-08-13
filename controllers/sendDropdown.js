@@ -29,13 +29,28 @@ const getNextScreen = async (decryptedBody) => {
   if (data?.error) return { data: { acknowledged: true } };
 
   if (action === "INIT") {
-    return { ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data};
+    return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
   }
 
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        return { ...SCREEN_RESPONSES.SUMMARY_SCREEN.data};
+        return SCREEN_RESPONSES.SUMMARY_SCREEN;
+
+      case "SUMMARY_SCREEN":
+        return {
+          screen: "SUCCESS",
+          data: {
+            extension_message_response: {
+              params: {
+                flow_token,
+                optional_param1: "value1",
+                optional_param2: "value2"
+              }
+            }
+          }
+        };
+
       default:
         throw new Error("Unhandled screen in data_exchange");
     }
