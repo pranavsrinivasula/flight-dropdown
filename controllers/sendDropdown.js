@@ -1,89 +1,72 @@
-const { decryptRequest, encryptResponse, isRequestSignatureValid } = require("../middleware/encryption");
-
+const { decryptRequest, encryptResponse, isRequestSignatureValid, FlowEndpointException } = require("../middleware/encryption");
 const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
 const PASSPHRASE = process.env.PASSPHRASE || "";
 
+// Flight Booking screens
 const SCREEN_RESPONSES = {
-  Flight_Booking: {
+  FLIGHT_BOOKING_SCREEN: {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
       trip_types: [
         { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
-        { id: "HYD_TO_GOA", title: "HYD TO GOA" },
-      ],
-    },
+        { id: "HYD_TO_GOA", title: "HYD TO GOA" }
+      ]
+    }
   },
-  Summary: {
+  SUMMARY_SCREEN: {
     screen: "SUMMARY_SCREEN",
     data: {
       selected_flight: "Hyderabad to Delhi - Economy Class\nMon Jan 01 2024 at 11:30",
-      details: "Passenger: PRANAV\nEmail: john@example.com\nPhone: 123456789\n\nWindow seat, vegetarian meal",
-      origin: "Hyderabad",
-      destination: "Delhi",
-      date: "2024-01-01",
-      time: "11:30",
-      passenger_name: "John Doe",
-      email: "john@example.com",
-      phone: "123456789",
-      extra_preferences: "Window seat, vegetarian meal",
-    },
-  },
+      details: "Passenger: PRANAV\nEmail: john@example.com\nPhone: 123456789\n\nWindow seat, vegetarian meal"
+    }
+  }
+};
+
+const getNextScreen = async (decryptedBody) => {
+  const { action, screen, flow_token, data } = decryptedBody;
+
+  if (action === "ping") return { data: { status: "active" } };
+  if (data?.error) return { data: { acknowledged: true } };
+
+  if (action === "INIT") {
+    return { ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN };
+  }
+
+  if (action === "data_exchange") {
+    switch (screen) {
+      case "FLIGHT_BOOKING_SCREEN":
+        return { ...SCREEN_RESPONSES.SUMMARY_SCREEN };
+      default:
+        throw new Error("Unhandled screen in data_exchange");
+    }
+  }
+
+  throw new Error("Unhandled action in Flow webhook");
 };
 
 const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
 
-    // 1️⃣ Validate signature first
-    if (!isRequestSignatureValid(req)) {
-      return res.status(401).json({ error: "Invalid signature" });
-    }
+    if (!isRequestSignatureValid(req)) return res.status(432).send(); // Signature mismatch
 
-    // 2️⃣ Parse raw body (req.body must be a Buffer)
     let encryptedBody = req.body;
-    if (Buffer.isBuffer(encryptedBody)) {
-      encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
-    }
+    if (Buffer.isBuffer(encryptedBody)) encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
 
-    // 3️⃣ Decrypt request
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
-      encryptedBody,
-      PRIVATE_KEY,
-      PASSPHRASE
-    );
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE);
 
     console.log("Decrypted Body:", decryptedBody);
 
-    // 4️⃣ Build response with proper structure: { screen, data }
-    let response;
+    const screenResponse = await getNextScreen(decryptedBody);
 
-    if (decryptedBody.action === "INIT") {
-      response = {
-        screen: SCREEN_RESPONSES.Flight_Booking.screen,
-        data: { ...SCREEN_RESPONSES.Flight_Booking.data }
-      };
-    } else if (
-      decryptedBody.action === "data_exchange" &&
-      decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
-    ) {
-      response = {
-        screen: SCREEN_RESPONSES.Summary.screen,
-        data: { ...SCREEN_RESPONSES.Summary.data }
-      };
-    } else {
-      response = { data: { message: "No matching action" } };
-    }
+    const encryptedResponse = encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer);
 
-    // 5️⃣ Encrypt response and send
-    const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
-    return res.json(encryptedResponse);
-
+    res.send(encryptedResponse);
   } catch (error) {
-    console.error("Error in flowWebhook:", error);
-    return res.status(error.statusCode || 400).json({ error: error.message || "Failed to decrypt request" });
+    console.error("Flow Webhook Error:", error);
+    if (error instanceof FlowEndpointException) return res.status(error.statusCode).send();
+    res.status(500).send();
   }
 };
 
-module.exports = {
-  flowWebhook,
-};
+module.exports = { flowWebhook, getNextScreen };

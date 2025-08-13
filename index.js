@@ -2,7 +2,8 @@ const express = require("express");
 const flowRoutes = require("./Routes/routes");
 const app = express();
 
-app.use("/", flowRoutes);
+// app.use("/", flowRoutes);
+app.use(flowRoutes);
 
 // JSON parser for other routes if any
 app.use(express.json());

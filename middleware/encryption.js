@@ -10,6 +10,9 @@ class FlowEndpointException extends Error {
 
 const APP_SECRET = process.env.APP_SECRET;
 
+/**
+ * Validate incoming request signature
+ */
 function isRequestSignatureValid(req) {
   if (!APP_SECRET) return true;
 
@@ -17,34 +20,35 @@ function isRequestSignatureValid(req) {
   if (!signatureHeader) return false;
 
   const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
-  const digest = crypto.createHmac("sha256", APP_SECRET).update(req.body).digest();
+  const digest = crypto.createHmac("sha256", APP_SECRET).update(req.rawBody || req.body).digest();
 
   return crypto.timingSafeEqual(digest, signatureBuffer);
 }
 
+/**
+ * Decrypt request from Flow
+ */
 function decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE) {
   try {
     const { encrypted_initialisation_vector, encrypted_aes_key, encrypted_payload } = encryptedBody;
 
     const privateKeyObject = crypto.createPrivateKey({ key: PRIVATE_KEY, passphrase: PASSPHRASE });
-
-    // Decrypt AES key and IV
     const aesKeyBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_aes_key, "base64"));
     const initialVectorBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_initialisation_vector, "base64"));
 
-    // Decrypt payload
     const decipher = crypto.createDecipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
     let decryptedPayload = decipher.update(encrypted_payload, "base64", "utf-8");
     decryptedPayload += decipher.final("utf-8");
 
-    const decryptedBody = JSON.parse(decryptedPayload);
-    return { aesKeyBuffer, initialVectorBuffer, decryptedBody };
+    return { aesKeyBuffer, initialVectorBuffer, decryptedBody: JSON.parse(decryptedPayload) };
   } catch (error) {
-    console.error("Decrypt error:", error);
     throw new FlowEndpointException("Failed to decrypt request", 400);
   }
 }
 
+/**
+ * Encrypt response to Flow
+ */
 function encryptResponse(responseBody, aesKeyBuffer, initialVectorBuffer) {
   try {
     const cipher = crypto.createCipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
@@ -53,7 +57,6 @@ function encryptResponse(responseBody, aesKeyBuffer, initialVectorBuffer) {
 
     return { encrypted_payload: encrypted };
   } catch (error) {
-    console.error("Encrypt error:", error);
     throw new FlowEndpointException("Failed to encrypt response", 500);
   }
 }
@@ -62,5 +65,5 @@ module.exports = {
   decryptRequest,
   encryptResponse,
   isRequestSignatureValid,
-  FlowEndpointException,
+  FlowEndpointException
 };
