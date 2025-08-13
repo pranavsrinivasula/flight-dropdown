@@ -2,7 +2,7 @@ const express = require("express");
 const flowRoutes = require("./Routes/routes");
 const app = express();
 
-// app.use("/", flowRoutes);
+app.use("/", flowRoutes);
 app.use(express.json({
   verify: (req, res, buf) => {
     req.rawBody = buf; // Store raw body buffer
@@ -10,7 +10,7 @@ app.use(express.json({
 }));
 
 // JSON parser for other routes if any
-app.use(express.json());
+// app.use(express.json());
 
 app.listen(3000, () => {
   console.log("Server running on port 3000");
