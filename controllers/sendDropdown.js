@@ -83,39 +83,50 @@ const getNextScreen = async (decryptedBody) => {
 //   }
 // };
 const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) {
-    throw new Error('Private key is empty. Please check your env variable "PRIVATE_KEY".');
-  }
-
-  if (!isRequestSignatureValid(req)) {
-    return res.status(432).send();
-  }
-
-  let encryptedBody;
   try {
-    // req.body might be Buffer if we used express.raw()
-    encryptedBody = Buffer.isBuffer(req.body)
-      ? JSON.parse(req.body.toString("utf8"))
-      : req.body;
+    // 1. Check private key
+    if (!PRIVATE_KEY) throw new Error("Private key missing");
 
-    const decryptedRequest = decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE);
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-
-    console.log("💬 Decrypted Request:", decryptedBody);
-
-    const screenResponse = await getNextScreen(decryptedBody);
-    console.log("👉 Response to Encrypt:", screenResponse);
-
-    const encryptedResponse = encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer);
-    res.send(encryptedResponse);
-
-  } catch (err) {
-    console.error(err);
-    if (err instanceof FlowEndpointException) {
-      return res.status(err.statusCode).send();
+    // 2. Validate signature
+    if (!isRequestSignatureValid(req)) {
+      return res.status(401).json({ error: "Invalid signature" });
     }
-    return res.status(500).send();
+
+    // 3. If req.body is a buffer, parse it
+    let encryptedBody = req.body;
+    if (Buffer.isBuffer(encryptedBody)) {
+      encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
+    }
+
+    // 4. Decrypt request
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
+      encryptedBody,
+      PRIVATE_KEY,
+      PASSPHRASE
+    );
+
+    console.log("Decrypted Body:", decryptedBody);
+
+    // 5. Process logic here (send dropdown, etc.)
+    const responseData = {
+      data: ["Option 1", "Option 2", "Option 3"]
+    };
+
+    // 6. Encrypt response before sending
+    const encryptedResponse = encryptResponse(
+      responseData,
+      aesKeyBuffer,
+      initialVectorBuffer
+    );
+
+    res.json(encryptedResponse);
+
+  } catch (error) {
+    console.error(error);
+    const status = error.statusCode || 500;
+    res.status(status).json({ error: error.message });
   }
 };
+
 
 module.exports = { flowWebhook, getNextScreen };
