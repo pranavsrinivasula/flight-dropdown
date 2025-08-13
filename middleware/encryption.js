@@ -17,9 +17,9 @@ function isRequestSignatureValid(req) {
   if (!signatureHeader) return false;
 
   const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
-  const hmac = crypto.createHmac("sha256", APP_SECRET).update(req.body).digest();
+  const digest = crypto.createHmac("sha256", APP_SECRET).update(req.body).digest();
 
-  return crypto.timingSafeEqual(hmac, signatureBuffer);
+  return crypto.timingSafeEqual(digest, signatureBuffer);
 }
 
 function decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE) {
@@ -28,9 +28,11 @@ function decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE) {
 
     const privateKeyObject = crypto.createPrivateKey({ key: PRIVATE_KEY, passphrase: PASSPHRASE });
 
+    // Decrypt AES key and IV
     const aesKeyBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_aes_key, "base64"));
     const initialVectorBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_initialisation_vector, "base64"));
 
+    // Decrypt payload
     const decipher = crypto.createDecipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
     let decryptedPayload = decipher.update(encrypted_payload, "base64", "utf-8");
     decryptedPayload += decipher.final("utf-8");

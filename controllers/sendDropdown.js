@@ -1,12 +1,7 @@
-const { decryptRequest, encryptResponse } = require("../middleware/encryption");
-const crypto = require("crypto");
-const { APP_SECRET, PASSPHRASE = "" } = process.env;  
+const { decryptRequest, encryptResponse, isRequestSignatureValid } = require("../middleware/encryption");
 
-const rawPrivateKey = process.env.PRIVATE_KEY;
-if (!rawPrivateKey) throw new Error("Private key missing");
-
-const PRIVATE_KEY = rawPrivateKey.replace(/\\n/g, "\n");  
-
+const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
+const PASSPHRASE = process.env.PASSPHRASE || "";
 
 const SCREEN_RESPONSES = {
   Flight_Booking: {
@@ -35,59 +30,59 @@ const SCREEN_RESPONSES = {
   },
 };
 
-
-
-
 const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing");
 
-    // Validate signature before processing
+    // 1️⃣ Validate signature first
     if (!isRequestSignatureValid(req)) {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
-    // Decrypt payload using your decryptRequest function
+    // 2️⃣ Parse raw body (req.body must be a Buffer)
+    let encryptedBody = req.body;
+    if (Buffer.isBuffer(encryptedBody)) {
+      encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
+    }
+
+    // 3️⃣ Decrypt request
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(
-      req.body,
+      encryptedBody,
       PRIVATE_KEY,
       PASSPHRASE
     );
 
     console.log("Decrypted Body:", decryptedBody);
 
+    // 4️⃣ Build response with proper structure: { screen, data }
     let response;
 
     if (decryptedBody.action === "INIT") {
       response = {
-        ...SCREEN_RESPONSES.Flight_Booking,
-        data: { ...SCREEN_RESPONSES.Flight_Booking.data },
+        screen: SCREEN_RESPONSES.Flight_Booking.screen,
+        data: { ...SCREEN_RESPONSES.Flight_Booking.data }
       };
     } else if (
       decryptedBody.action === "data_exchange" &&
       decryptedBody.screen === "FLIGHT_BOOKING_SCREEN"
     ) {
       response = {
-        ...SCREEN_RESPONSES.Summary,
-        data: { ...SCREEN_RESPONSES.Summary.data },
+        screen: SCREEN_RESPONSES.Summary.screen,
+        data: { ...SCREEN_RESPONSES.Summary.data }
       };
     } else {
       response = { data: { message: "No matching action" } };
     }
 
+    // 5️⃣ Encrypt response and send
     const encryptedResponse = encryptResponse(response, aesKeyBuffer, initialVectorBuffer);
-
-
-    return res.json(encryptedResponse) 
-    // return res.json(response); 
+    return res.json(encryptedResponse);
 
   } catch (error) {
     console.error("Error in flowWebhook:", error);
     return res.status(error.statusCode || 400).json({ error: error.message || "Failed to decrypt request" });
   }
 };
-
-
 
 module.exports = {
   flowWebhook,
