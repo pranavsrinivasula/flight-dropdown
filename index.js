@@ -3,7 +3,11 @@ const flowRoutes = require("./Routes/routes");
 const app = express();
 
 // app.use("/", flowRoutes);
-app.use(flowRoutes);
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf; // Store raw body buffer
+  }
+}));
 
 // JSON parser for other routes if any
 app.use(express.json());

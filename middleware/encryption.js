@@ -14,16 +14,19 @@ const APP_SECRET = process.env.APP_SECRET;
  * Validate incoming request signature
  */
 function isRequestSignatureValid(req) {
-  if (!APP_SECRET) return true;
+  const expectedSignature = req.get('X-Hub-Signature-256');
+  const hmac = crypto.createHmac('sha256', APP_SECRET);
 
-  const signatureHeader = req.get("x-hub-signature-256");
-  if (!signatureHeader) return false;
+  // Use rawBody instead of req.body
+  hmac.update(req.rawBody);
 
-  const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
-  const digest = crypto.createHmac("sha256", APP_SECRET).update(req.rawBody).digest();
-
-  return crypto.timingSafeEqual(digest, signatureBuffer);
+  const actualSignature = `sha256=${hmac.digest('hex')}`;
+  return crypto.timingSafeEqual(
+    Buffer.from(actualSignature),
+    Buffer.from(expectedSignature)
+  );
 }
+
 
 /**
  * Decrypt request from Flow
