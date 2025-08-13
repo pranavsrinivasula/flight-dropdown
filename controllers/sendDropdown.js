@@ -1,8 +1,8 @@
 const { decryptRequest, encryptResponse, isRequestSignatureValid, FlowEndpointException } = require("../middleware/encryption");
 const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
-const PASSPHRASE = process.env.PASSPHRASE || "";
+const PASSPHRASE = process.env.PASSPHRASE;
 
-// Flight Booking screens
+
 const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
     screen: "FLIGHT_BOOKING_SCREEN",

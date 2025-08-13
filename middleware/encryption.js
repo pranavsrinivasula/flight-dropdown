@@ -14,26 +14,33 @@ const APP_SECRET = process.env.APP_SECRET;
  * Validate incoming request signature
  */
 function isRequestSignatureValid(req) {
-    if (!APP_SECRET) {
-        console.warn("App Secret is not set up. Please Add your app secret in /.env file to check for request validation");
-        return true;
-    }
+  if (!APP_SECRET) {
+    console.warn("App Secret is not set. Add APP_SECRET to your .env to enable signature validation.");
+    return true; // Skip validation if not set
+  }
 
-    const signatureHeader = req.get("x-hub-signature-256");
-    const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "utf-8");
+  const signatureHeader = req.get("x-hub-signature-256");
+  if (!signatureHeader) {
+    console.error("Missing x-hub-signature-256 header");
+    return false;
+  }
 
-    const hmac = crypto.createHmac("sha256", APP_SECRET);
-     hmac.update(req.rawBody);
-    const digestString = hmac.update(req.rawBody).digest('hex');
-    const digestBuffer = Buffer.from(digestString, "utf-8");
+  // Remove the prefix and convert from hex
+  const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
 
-    if (!crypto.timingSafeEqual(digestBuffer, signatureBuffer)) {
-        console.error("Error: Request Signature did not match");
-        return false;
-    }
-    return true;
+  // Generate HMAC from raw request body
+  const hmac = crypto.createHmac("sha256", APP_SECRET);
+  hmac.update(req.rawBody); // only update once
+  const digestBuffer = Buffer.from(hmac.digest("hex"), "hex");
+
+  // Compare safely
+  if (!crypto.timingSafeEqual(digestBuffer, signatureBuffer)) {
+    console.error("Error: Request signature did not match");
+    return false;
+  }
+
+  return true;
 }
-
 
 
 /**
