@@ -23,6 +23,7 @@ function isRequestSignatureValid(req) {
     const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "utf-8");
 
     const hmac = crypto.createHmac("sha256", APP_SECRET);
+     hmac.update(req.rawBody);
     const digestString = hmac.update(req.rawBody).digest('hex');
     const digestBuffer = Buffer.from(digestString, "utf-8");
 
