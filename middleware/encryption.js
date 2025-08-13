@@ -14,32 +14,18 @@ const APP_SECRET = process.env.APP_SECRET;
  * Validate incoming request signature
  */
 function isRequestSignatureValid(req) {
-  if (!APP_SECRET) {
-    console.warn("App Secret is not set. Add APP_SECRET to your .env to enable signature validation.");
-    return true; // Skip validation if not set
-  }
+  if (!APP_SECRET) return true;
 
   const signatureHeader = req.get("x-hub-signature-256");
-  if (!signatureHeader) {
-    console.error("Missing x-hub-signature-256 header");
-    return false;
-  }
+  if (!signatureHeader) return false;
 
-  // Remove the prefix and convert from hex
   const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
 
-  // Generate HMAC from raw request body
   const hmac = crypto.createHmac("sha256", APP_SECRET);
-  hmac.update(req.rawBody); // only update once
+  hmac.update(req.rawBody);
   const digestBuffer = Buffer.from(hmac.digest("hex"), "hex");
 
-  // Compare safely
-  if (!crypto.timingSafeEqual(digestBuffer, signatureBuffer)) {
-    console.error("Error: Request signature did not match");
-    return false;
-  }
-
-  return true;
+  return crypto.timingSafeEqual(digestBuffer, signatureBuffer);
 }
 
 
