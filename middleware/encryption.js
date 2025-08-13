@@ -14,18 +14,20 @@ const APP_SECRET = process.env.APP_SECRET;
  * Validate incoming request signature
  */
 function isRequestSignatureValid(req) {
-  const expectedSignature = req.get('X-Hub-Signature-256');
-  const hmac = crypto.createHmac('sha256', APP_SECRET);
+  const expectedSignature = req.get("X-Hub-Signature-256");
+  if (!expectedSignature) return false;
 
-  // Use rawBody instead of req.body
-  hmac.update(req.rawBody);
+  const hmac = crypto.createHmac("sha256", APP_SECRET);
+  hmac.update(req.rawBody); // now defined
 
-  const actualSignature = `sha256=${hmac.digest('hex')}`;
+  const actualSignature = `sha256=${hmac.digest("hex")}`;
+
   return crypto.timingSafeEqual(
     Buffer.from(actualSignature),
     Buffer.from(expectedSignature)
   );
 }
+
 
 
 /**
