@@ -1,4 +1,4 @@
-const { decryptRequest, encryptResponse, isRequestSignatureValid, FlowEndpointException } = require("../middleware/encryption");
+const { decryptRequest, encryptResponse,FlowEndpointException } = require("../middleware/encryption");
 const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
 const PASSPHRASE = process.env.PASSPHRASE;
 
@@ -19,7 +19,18 @@ const SCREEN_RESPONSES = {
       selected_flight: "Hyderabad to Delhi - Economy Class\nMon Jan 01 2024 at 11:30",
       details: "Passenger: PRANAV\nEmail: john@example.com\nPhone: 123456789\n\nWindow seat, vegetarian meal"
     }
-  }
+  },
+  SUCCESS: {
+        screen: "SUCCESS",
+        data: {
+            extension_message_response: {
+                params: {
+                    flow_token: "REPLACE_FLOW_TOKEN",
+                    some_param_name: "PASS_CUSTOM_VALUE",
+                },
+            },
+        },
+    },
 };
 
 const getNextScreen = async (decryptedBody) => {
@@ -29,33 +40,45 @@ const getNextScreen = async (decryptedBody) => {
   if (data?.error) return { data: { acknowledged: true } };
 
   if (action === "INIT") {
-    return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
-  }
+    return{ ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN,
+      data:{
+        ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
 
+      }
+
+  }
+  }
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        return SCREEN_RESPONSES.SUMMARY_SCREEN;
-
+        return {
+          ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN,
+          data:{
+            ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+          }
+        }
+      
       case "SUMMARY_SCREEN":
         return {
-          screen: "SUCCESS",  
+      ...SCREEN_RESPONSES.SUMMARY_SCREEN,  
           data: {
             extension_message_response: {
               params: {
                 flow_token,
-  
-              }
+                }
             }
           }
         };
 
       default:
-        throw new Error("Unhandled screen in data_exchange");
-    }
+        break;   
+ }
   }
 
-  throw new Error("Unhandled action in Flow webhook");
+    console.error("Unhandled request body:", decryptedBody);
+    throw new Error(
+        "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    );
 };
 
 // const flowWebhook = async (req, res) => {
@@ -83,22 +106,19 @@ const getNextScreen = async (decryptedBody) => {
 //   }
 // };
 const flowWebhook = async (req, res) => {
-  try {
-    // 1. Check private key
-    if (!PRIVATE_KEY) throw new Error("Private key missing");
-
-    // 2. Validate signature
-    if (!isRequestSignatureValid(req)) {
-      return res.status(401).json({ error: "Invalid signature" });
+    if (!PRIVATE_KEY) {
+        throw new Error(
+            'Private key is empty. Please check your env variable "PRIVATE_KEY".'
+        );
     }
 
-    // 3. If req.body is a buffer, parse it
-    // let encryptedBody = req.body;
-    // if (Buffer.isBuffer(encryptedBody)) {
-    //   encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
-    // }
+    if (!isRequestSignatureValid(req)) {
+        // Return status code 432 if request signature does not match.
+        // To learn more about return error codes visit: https://developers.facebook.com/docs/whatsapp/flows/reference/error-codes#endpoint_error_codes
+        return res.status(432).send();
+    }
 
- let decryptedRequest = null;
+    let decryptedRequest = null;
     try {
         decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
     } catch (err) {
@@ -109,30 +129,14 @@ const flowWebhook = async (req, res) => {
         return res.status(500).send();
     }
 
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
+    console.log("💬 Decrypted Request:", decryptedBody);
 
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest;
+    const screenResponse = await getNextScreen(decryptedBody);
+    console.log("👉 Response to Encrypt:", screenResponse);
 
-    console.log("Decrypted Body:", decryptedBody);
-
-     const screenResponse = await getNextScreen(decryptedBody);
-
-    // 6. Encrypt response before sending
-    // const encryptedResponse = encryptResponse(
-    //   responseData,
-    //   aesKeyBuffer,
-    //   initialVectorBuffer
-    // );
-
-    // res.json(encryptedResponse);
     res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
-
-  
-  } catch (error) {
-    console.error(error);
-    const status = error.statusCode || 500;
-    res.status(status).json({ error: error.message });
-  }
-};
+}
 
 
 module.exports = { flowWebhook, getNextScreen };

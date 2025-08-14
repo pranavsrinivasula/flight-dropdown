@@ -3,6 +3,6 @@ const router = express.Router();
 const { flowWebhook } = require("../controllers/sendDropdown");
 
 // POST /flow-webhook/
-router.post("/flow-webhook", express.raw({ type: "*/*" }), flowWebhook);
+router.post("/flow-webhook",  flowWebhook);
 
 module.exports = router;
