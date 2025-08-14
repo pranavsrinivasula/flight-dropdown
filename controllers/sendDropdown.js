@@ -40,46 +40,55 @@ const getNextScreen = async (decryptedBody) => {
   if (data?.error) return { data: { acknowledged: true } };
 
   if (action === "INIT") {
-    return{ ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN,
-      data:{
-        ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-
-      }
-
+    // When flow first loads
+    return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
   }
-  }
+
   if (action === "data_exchange") {
-    switch (screen) {
-      case "FLIGHT_BOOKING_SCREEN":
+    const trigger = data?.trigger;
+
+    if (trigger === "load_trip_types") {
+      try {
+        // Call your real API endpoint here
+        const response = await fetch("https://my-api.com/flights"); // change to your real endpoint
+        const flights = await response.json();
+
         return {
-          ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN,
-          data:{
-            ...SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-          }
-        }
-      
-      case "SUMMARY_SCREEN":
-        return {
-      ...SCREEN_RESPONSES.SUMMARY_SCREEN,  
+          screen: "FLIGHT_BOOKING_SCREEN",
           data: {
-            extension_message_response: {
-              params: {
-                flow_token,
-                }
-            }
+            trip_types: flights.map(f => ({
+              id: f.id,
+              title: `${f.from} to ${f.to}`
+            }))
           }
         };
+      } catch (err) {
+        console.error("Failed to fetch trip types:", err);
+        return {
+          screen: "FLIGHT_BOOKING_SCREEN",
+          data: {
+            trip_types: []
+          }
+        };
+      }
+    }
 
-      default:
-        break;   
- }
+    if (trigger === "trip_type_selected") {
+      return {
+        screen: "SUMMARY_SCREEN",
+        data: {
+          selected_trip: data?.selected_trip || "No trip selected"
+        }
+      };
+    }
   }
 
-    console.error("Unhandled request body:", decryptedBody);
-    throw new Error(
-        "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
-    );
+  console.error("Unhandled request body:", decryptedBody);
+  throw new Error(
+    "Unhandled endpoint request. Make sure you handle the request action & trigger."
+  );
 };
+
 
 // const flowWebhook = async (req, res) => {
 //   try {
