@@ -1,73 +1,95 @@
+
 const crypto = require("crypto");
 
-class FlowEndpointException extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.name = "FlowEndpointException";
+const decryptRequest = (body, privatePem, passphrase) => {
+  const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
+
+  const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
+  let decryptedAesKey = null;
+  try {
+    // decrypt AES key created by client
+    decryptedAesKey = crypto.privateDecrypt(
+      {
+        key: privateKey,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: "sha256",
+      },
+      Buffer.from(encrypted_aes_key, "base64")
+    );
+  } catch (error) {
+    console.error(error);
+    /*
+    Failed to decrypt. Please verify your private key.
+    If you change your public key. You need to return HTTP status code 421 to refresh the public key on the client
+    */
+    throw new FlowEndpointException(
+      421,
+      "Failed to decrypt the request. Please verify your private key."
+    );
+  }
+
+  // decrypt flow data
+  const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
+  const initialVectorBuffer = Buffer.from(initial_vector, "base64");
+
+  const TAG_LENGTH = 16;
+  const encrypted_flow_data_body = flowDataBuffer.subarray(0, -TAG_LENGTH);
+  const encrypted_flow_data_tag = flowDataBuffer.subarray(-TAG_LENGTH);
+
+  const decipher = crypto.createDecipheriv(
+    "aes-128-gcm",
+    decryptedAesKey,
+    initialVectorBuffer
+  );
+  decipher.setAuthTag(encrypted_flow_data_tag);
+
+  const decryptedJSONString = Buffer.concat([
+    decipher.update(encrypted_flow_data_body),
+    decipher.final(),
+  ]).toString("utf-8");
+
+  return {
+    decryptedBody: JSON.parse(decryptedJSONString),
+    aesKeyBuffer: decryptedAesKey,
+    initialVectorBuffer,
+  };
+};
+
+const encryptResponse = (
+  response,
+  aesKeyBuffer,
+  initialVectorBuffer
+) => {
+  // flip initial vector
+  const flipped_iv = [];
+  for (const pair of initialVectorBuffer.entries()) {
+    flipped_iv.push(~pair[1]);
+  }
+
+  // encrypt response data
+  const cipher = crypto.createCipheriv(
+    "aes-128-gcm",
+    aesKeyBuffer,
+    Buffer.from(flipped_iv)
+  );
+  return Buffer.concat([
+    cipher.update(JSON.stringify(response), "utf-8"),
+    cipher.final(),
+    cipher.getAuthTag(),
+  ]).toString("base64");
+};
+
+const FlowEndpointException = class FlowEndpointException extends Error {
+  constructor (statusCode, message) {
+    super(message)
+
+    this.name = this.constructor.name
     this.statusCode = statusCode;
   }
 }
 
-const APP_SECRET = process.env.APP_SECRET;
-
-/**
- * Validate incoming request signature
- */
-function isRequestSignatureValid(req) {
-  if (!APP_SECRET) return true;
-
-  const signatureHeader = req.get("x-hub-signature-256");
-  if (!signatureHeader) return false;
-
-  const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "hex");
-
-  const hmac = crypto.createHmac("sha256", APP_SECRET);
-  hmac.update(req.rawBody);
-  const digestBuffer = Buffer.from(hmac.digest("hex"), "hex");
-
-  return crypto.timingSafeEqual(digestBuffer, signatureBuffer);
-}
-
-
-/**
- * Decrypt request from Flow
- */
-function decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE) {
-  try {
-    const { encrypted_initialisation_vector, encrypted_aes_key, encrypted_payload } = encryptedBody;
-
-    const privateKeyObject = crypto.createPrivateKey({ key: PRIVATE_KEY, passphrase: PASSPHRASE });
-    const aesKeyBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_aes_key, "base64"));
-    const initialVectorBuffer = crypto.privateDecrypt(privateKeyObject, Buffer.from(encrypted_initialisation_vector, "base64"));
-
-    const decipher = crypto.createDecipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
-    let decryptedPayload = decipher.update(encrypted_payload, "base64", "utf-8");
-    decryptedPayload += decipher.final("utf-8");
-
-    return { aesKeyBuffer, initialVectorBuffer, decryptedBody: JSON.parse(decryptedPayload) };
-  } catch (error) {
-    throw new FlowEndpointException("Failed to decrypt request", 400);
-  }
-}
-
-/**
- * Encrypt response to Flow
- */
-function encryptResponse(responseBody, aesKeyBuffer, initialVectorBuffer) {
-  try {
-    const cipher = crypto.createCipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
-    let encrypted = cipher.update(JSON.stringify(responseBody), "utf8", "base64");
-    encrypted += cipher.final("base64");
-
-    return { encrypted_payload: encrypted };
-  } catch (error) {
-    throw new FlowEndpointException("Failed to encrypt response", 500);
-  }
-}
-
 module.exports = {
-  decryptRequest,
-  encryptResponse,
-  isRequestSignatureValid,
-  FlowEndpointException
-};
+    decryptRequest,
+    encryptResponse,
+    FlowEndpointException
+}
