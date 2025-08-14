@@ -1,4 +1,5 @@
-const { decryptRequest, encryptResponse,FlowEndpointException, isRequestSignatureValid } = require("../middleware/encryption");
+const { decryptRequest, encryptResponse,FlowEndpointException } = require("../middleware/encryption");
+const {isRequestSignatureValid} = require("../middleware/valid");
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
 
