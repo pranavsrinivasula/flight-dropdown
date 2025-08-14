@@ -1,9 +1,9 @@
 const express = require("express");
 const flowRoutes = require("./Routes/routes");
 const app = express();
-const cors = require('cors')
+const cors = require('cors');
 const bodyParser = require('body-parser')
-
+const PORT = process.env.PORT || 3000
 app.use(
   express.json({
     // store the raw request body to use it for signature verification
@@ -26,7 +26,7 @@ app.use("/", flowRoutes);
 
 
 app.listen(PORT, async () => {
-    console.log('Server running on port ' + PORT)
+    console.log('Server running on port ' + PORT||3000)
 })
 
 process.on('uncaughtException', (err) => {

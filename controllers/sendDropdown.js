@@ -1,5 +1,5 @@
-const { decryptRequest, encryptResponse,FlowEndpointException } = require("../middleware/encryption");
-const PRIVATE_KEY = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
+const { decryptRequest, encryptResponse,FlowEndpointException, isRequestSignatureValid } = require("../middleware/encryption");
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
 
 
@@ -111,23 +111,29 @@ const flowWebhook = async (req, res) => {
             'Private key is empty. Please check your env variable "PRIVATE_KEY".'
         );
     }
+console.log("flowwebhook",flowWebhook);
 
     if (!isRequestSignatureValid(req)) {
         // Return status code 432 if request signature does not match.
         // To learn more about return error codes visit: https://developers.facebook.com/docs/whatsapp/flows/reference/error-codes#endpoint_error_codes
         return res.status(432).send();
     }
+console.log("valid sign only",isRequestSignatureValid);
 
     let decryptedRequest = null;
     try {
         decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
-    } catch (err) {
+    } 
+ 
+    
+    catch (err) {
         console.error(err);
         if (err instanceof FlowEndpointException) {
             return res.status(err.statusCode).send();
         }
         return res.status(500).send();
     }
+console.log("req.body ia ",req.body);
 
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
     console.log("💬 Decrypted Request:", decryptedBody);
@@ -136,6 +142,8 @@ const flowWebhook = async (req, res) => {
     console.log("👉 Response to Encrypt:", screenResponse);
 
     res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
+    console.log("enxrypted response is"+encryptResponse);
+    
 }
 
 
