@@ -50,7 +50,7 @@ const getNextScreen = async (decryptedBody) => {
     if (trigger === "load_trip_types") {
       try {
         // Call your real API endpoint here
-        const response = await fetch("https://my-api.com/flights"); // change to your real endpoint
+        const response = await fetch("https://flight-dropdown.onrender.com/flow-webhook"); // change to your real endpoint
         const flights = await response.json();
 
         return {
