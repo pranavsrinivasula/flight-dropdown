@@ -76,7 +76,7 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "INIT") {
     const today = new Date();
     const maxDate = new Date();
-    maxDate.setDate(today.getDate() + 30);
+    maxDate.setDate(today.getDate() + 365);
 
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
