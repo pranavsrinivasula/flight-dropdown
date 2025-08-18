@@ -1,8 +1,7 @@
-const { decryptRequest, encryptResponse,FlowEndpointException } = require("../middleware/encryption");
-const {isRequestSignatureValid} = require("../middleware/valid");
+const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
+const { isRequestSignatureValid } = require("../middleware/valid");
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
-
 
 const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
@@ -22,27 +21,49 @@ const SCREEN_RESPONSES = {
     }
   },
   SUCCESS: {
-        screen: "SUCCESS",
-        data: {
-            extension_message_response: {
-                params: {
-                    flow_token: "REPLACE_FLOW_TOKEN",
-                    some_param_name: "PASS_CUSTOM_VALUE",
-                },
-            },
-        },
-    },
+    screen: "SUCCESS",
+    data: {
+      extension_message_response: {
+        params: {
+          flow_token: "REPLACE_FLOW_TOKEN",
+          some_param_name: "PASS_CUSTOM_VALUE"
+        }
+      }
+    }
+  }
 };
 
+
+const formatDate = (date) => date.toISOString().split("T")[0];
+
 const getNextScreen = async (decryptedBody) => {
-  const { action, screen, flow_token, data } = decryptedBody;
+  const { action, data } = decryptedBody;
 
   if (action === "ping") return { data: { status: "active" } };
   if (data?.error) return { data: { acknowledged: true } };
 
   if (action === "INIT") {
-    // When flow first loads
-    return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
+
+    const today = new Date();
+    const todayStr = formatDate(today);
+
+    const maxDate = new Date();
+    maxDate.setDate(today.getDate() + 30);
+    const maxDateStr = formatDate(maxDate);
+
+    return {
+      screen: "FLIGHT_BOOKING_SCREEN",
+      data: {
+        calendar: {
+          "min-date": todayStr,
+          "max-date": maxDateStr,
+          "init-value": {
+            "start-date": todayStr,
+            "end-date": todayStr
+          }
+        }
+      }
+    };
   }
 
   if (action === "data_exchange") {
@@ -50,8 +71,7 @@ const getNextScreen = async (decryptedBody) => {
 
     if (trigger === "load_trip_types") {
       try {
-        // Call your real API endpoint here
-        const response = await fetch("https://flight-dropdown.onrender.com"); // change to your real endpoint
+        const response = await fetch("https://flight-dropdown.onrender.com");
         const flights = await response.json();
 
         return {
@@ -85,76 +105,36 @@ const getNextScreen = async (decryptedBody) => {
   }
 
   console.error("Unhandled request body:", decryptedBody);
-  throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & trigger."
-  );
+  throw new Error("Unhandled endpoint request.");
 };
 
-
-// const flowWebhook = async (req, res) => {
-//   try {
-//     if (!PRIVATE_KEY) throw new Error("Private key missing");
-
-//     if (!isRequestSignatureValid(req)) return res.status(432).send(); 
-
-//     let encryptedBody = req.body;
-//     if (Buffer.isBuffer(encryptedBody)) encryptedBody = JSON.parse(encryptedBody.toString("utf8"));
-
-//     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptRequest(encryptedBody, PRIVATE_KEY, PASSPHRASE);
-
-//     console.log("Decrypted Body:", decryptedBody);
-
-//     const screenResponse = await getNextScreen(decryptedBody);
-
-//     const encryptedResponse = encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer);
-
-//     res.send(encryptedResponse);
-//   } catch (error) {
-//     console.error("Flow Webhook Error:", error);
-//     if (error instanceof FlowEndpointException) return res.status(error.statusCode).send();
-//     res.status(500).send();
-//   }
-// };
 const flowWebhook = async (req, res) => {
-    if (!PRIVATE_KEY) {
-        throw new Error(
-            'Private key is empty. Please check your env variable "PRIVATE_KEY".'
-        );
+  if (!PRIVATE_KEY) {
+    throw new Error('Private key is empty. Please check env variable "PRIVATE_KEY".');
+  }
+
+  if (!isRequestSignatureValid(req)) {
+    return res.status(432).send();
+  }
+
+  let decryptedRequest;
+  try {
+    decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+  } catch (err) {
+    console.error(err);
+    if (err instanceof FlowEndpointException) {
+      return res.status(err.statusCode).send();
     }
-console.log("flowwebhook",flowWebhook);
+    return res.status(500).send();
+  }
 
-    if (!isRequestSignatureValid(req)) {
-        // Return status code 432 if request signature does not match.
-        // To learn more about return error codes visit: https://developers.facebook.com/docs/whatsapp/flows/reference/error-codes#endpoint_error_codes
-        return res.status(432).send();
-    }
-console.log("valid sign only",isRequestSignatureValid);
+  const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
+  console.log("💬 Decrypted Request:", decryptedBody);
 
-    let decryptedRequest = null;
-    try {
-        decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
-    } 
- 
-    
-    catch (err) {
-        console.error(err);
-        if (err instanceof FlowEndpointException) {
-            return res.status(err.statusCode).send();
-        }
-        return res.status(500).send();
-    }
-console.log("req.body ia ",req.body);
+  const screenResponse = await getNextScreen(decryptedBody);
+  console.log("👉 Response to Encrypt:", screenResponse);
 
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-    console.log("💬 Decrypted Request:", decryptedBody);
-
-    const screenResponse = await getNextScreen(decryptedBody);
-    console.log("👉 Response to Encrypt:", screenResponse);
-
-    res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
-    console.log("enxrypted response is"+encryptResponse);
-    
-}
-
+  res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
+};
 
 module.exports = { flowWebhook, getNextScreen };
