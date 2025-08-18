@@ -33,7 +33,6 @@ const SCREEN_RESPONSES = {
   }
 };
 
-
 const formatDate = (date) => date.toISOString().split("T")[0];
 
 const getNextScreen = async (decryptedBody) => {
@@ -43,7 +42,6 @@ const getNextScreen = async (decryptedBody) => {
   if (data?.error) return { data: { acknowledged: true } };
 
   if (action === "INIT") {
-
     const today = new Date();
     const todayStr = formatDate(today);
 
@@ -61,7 +59,8 @@ const getNextScreen = async (decryptedBody) => {
             "start-date": todayStr,
             "end-date": todayStr
           }
-        }
+        },
+        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
       }
     };
   }
@@ -70,28 +69,12 @@ const getNextScreen = async (decryptedBody) => {
     const trigger = data?.trigger;
 
     if (trigger === "load_trip_types") {
-      try {
-        const response = await fetch("https://flight-dropdown.onrender.com");
-        const flights = await response.json();
-
-        return {
-          screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            trip_types: flights.map(f => ({
-              id: f.id,
-              title: `${f.from} to ${f.to}`
-            }))
-          }
-        };
-      } catch (err) {
-        console.error("Failed to fetch trip types:", err);
-        return {
-          screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            trip_types: []
-          }
-        };
-      }
+      return {
+        screen: "FLIGHT_BOOKING_SCREEN",
+        data: {
+          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
+        }
+      };
     }
 
     if (trigger === "trip_type_selected") {
@@ -105,7 +88,7 @@ const getNextScreen = async (decryptedBody) => {
   }
 
   console.error("Unhandled request body:", decryptedBody);
-  throw new Error("Unhandled endpoint request.");
+  return { data: { acknowledged: true } };
 };
 
 const flowWebhook = async (req, res) => {
