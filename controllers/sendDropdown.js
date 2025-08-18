@@ -17,24 +17,16 @@ const SCREEN_RESPONSES = {
   SUMMARY_SCREEN: {
     screen: "SUMMARY_SCREEN",
     data: {
-      selected_trip: "Hyderabad to Delhi - Economy Class\nMon Jan 01 2024 at 11:30",
-      details: "Passenger: PRANAV\nEmail: john@example.com\nPhone: 123456789\n\nWindow seat, vegetarian meal"
-    }
-  },
-  SUCCESS: {
-    screen: "SUCCESS",
-    data: {
-      extension_message_response: {
-        params: {
-          flow_token: "REPLACE_FLOW_TOKEN",
-          some_param_name: "PASS_CUSTOM_VALUE"
-        }
+      selected_trip: "",
+      selected_dates: {
+        start_date: "",
+        end_date: ""
       }
     }
   }
 };
 
-// Helper to format date for calendar
+// Helper to format date as YYYY-MM-DD
 const formatDate = (date) => date.toISOString().split("T")[0];
 
 // Main logic to determine next screen
@@ -53,26 +45,22 @@ const getNextScreen = async (decryptedBody) => {
 
   // Initial screen load
   if (action === "INIT") {
-    const today = new Date()
-    const currentDate = new Date();
-    const dateOnly = currentDate.toISOString().split('T')[0];
-
+    const today = new Date();
     const maxDate = new Date();
     maxDate.setDate(today.getDate() + 30);
-    const maxDateStr = formatDate(maxDate);
 
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
+        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
         calendar: {
-          "min-date": today,
-          "max-date": maxDateStr,
-          "init-value": {
-            "start-date": today,
-            "end-date": maxDateStr
+          min_date: formatDate(today),
+          max_date: formatDate(maxDate),
+          init_value: {
+            start_date: formatDate(today),
+            end_date: formatDate(maxDate)
           }
-        },
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
+        }
       }
     };
   }
@@ -81,22 +69,23 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "data_exchange") {
     const trigger = data?.trigger;
 
-    // Load trip types
-    if (trigger === "load_trip_types") {
-      return {
-        screen: "FLIGHT_BOOKING_SCREEN",
-        data: {
-          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
-        }
-      };
-    }
-
     // Trip type selected → show summary
     if (trigger === "trip_type_selected") {
       return {
         screen: "SUMMARY_SCREEN",
         data: {
-          selected_trip: data?.selected_trip || SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types[0].title
+          selected_trip: data?.selected_trip || SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types[0].title,
+          selected_dates: data?.selected_dates || { start_date: "", end_date: "" }
+        }
+      };
+    }
+
+    // Load trip types again if needed
+    if (trigger === "load_trip_types") {
+      return {
+        screen: "FLIGHT_BOOKING_SCREEN",
+        data: {
+          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
         }
       };
     }
