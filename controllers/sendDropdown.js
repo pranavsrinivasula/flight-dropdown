@@ -82,14 +82,14 @@ const getNextScreen = async (decryptedBody) => {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
         trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-        calendar: {
-          min_date: formatDate(today),
-          max_date: null,
-          init_value: {
-            start_date: formatDate(today),
-            end_date: formatDate(maxDate)
-          }
-        }
+       calendar: {
+                  min_date: formatDate(today),
+                  max_date: formatDate(maxDate),
+                  init_value: {
+                    start_date: formatDate(today),
+                    end_date: formatDate(maxDate)
+                  }
+                }
       }
     };
   }
