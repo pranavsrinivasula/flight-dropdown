@@ -3,6 +3,7 @@ const { isRequestSignatureValid } = require("../middleware/valid");
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
 
+// Predefined screens and data
 const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
     screen: "FLIGHT_BOOKING_SCREEN",
@@ -16,7 +17,7 @@ const SCREEN_RESPONSES = {
   SUMMARY_SCREEN: {
     screen: "SUMMARY_SCREEN",
     data: {
-      selected_flight: "Hyderabad to Delhi - Economy Class\nMon Jan 01 2024 at 11:30",
+      selected_trip: "Hyderabad to Delhi - Economy Class\nMon Jan 01 2024 at 11:30",
       details: "Passenger: PRANAV\nEmail: john@example.com\nPhone: 123456789\n\nWindow seat, vegetarian meal"
     }
   },
@@ -33,14 +34,24 @@ const SCREEN_RESPONSES = {
   }
 };
 
+// Helper to format date for calendar
 const formatDate = (date) => date.toISOString().split("T")[0];
 
+// Main logic to determine next screen
 const getNextScreen = async (decryptedBody) => {
   const { action, data } = decryptedBody;
 
-  if (action === "ping") return { data: { status: "active" } };
-  if (data?.error) return { data: { acknowledged: true } };
+  // Ping request
+  if (action === "ping") {
+    return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
+  }
 
+  // Error handling
+  if (data?.error) {
+    return { screen: decryptedBody.screen || "FLIGHT_BOOKING_SCREEN", data: { acknowledged: true } };
+  }
+
+  // Initial screen load
   if (action === "INIT") {
     const today = new Date();
     const todayStr = formatDate(today);
@@ -65,9 +76,11 @@ const getNextScreen = async (decryptedBody) => {
     };
   }
 
+  // Data exchange triggers
   if (action === "data_exchange") {
     const trigger = data?.trigger;
 
+    // Load trip types
     if (trigger === "load_trip_types") {
       return {
         screen: "FLIGHT_BOOKING_SCREEN",
@@ -77,25 +90,32 @@ const getNextScreen = async (decryptedBody) => {
       };
     }
 
+    // Trip type selected → show summary
     if (trigger === "trip_type_selected") {
       return {
         screen: "SUMMARY_SCREEN",
         data: {
-          selected_trip: data?.selected_trip || "No trip selected"
+          selected_trip: data?.selected_trip || SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types[0].title
         }
       };
     }
   }
 
-  console.error("Unhandled request body:", decryptedBody);
-  return { data: { acknowledged: true } };
+  // Default handler for unhandled requests
+  console.warn("Unhandled request body:", decryptedBody);
+  return {
+    screen: decryptedBody.screen || "FLIGHT_BOOKING_SCREEN",
+    data: { acknowledged: true }
+  };
 };
 
+// Flow webhook endpoint
 const flowWebhook = async (req, res) => {
   if (!PRIVATE_KEY) {
     throw new Error('Private key is empty. Please check env variable "PRIVATE_KEY".');
   }
 
+  // Validate request signature
   if (!isRequestSignatureValid(req)) {
     return res.status(432).send();
   }
@@ -104,7 +124,7 @@ const flowWebhook = async (req, res) => {
   try {
     decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
   } catch (err) {
-    console.error(err);
+    console.error("Decryption failed:", err);
     if (err instanceof FlowEndpointException) {
       return res.status(err.statusCode).send();
     }
@@ -112,10 +132,10 @@ const flowWebhook = async (req, res) => {
   }
 
   const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-  console.log("💬 Decrypted Request:", decryptedBody);
+  console.log("💬 Decrypted Request:", JSON.stringify(decryptedBody, null, 2));
 
   const screenResponse = await getNextScreen(decryptedBody);
-  console.log("👉 Response to Encrypt:", screenResponse);
+  console.log("👉 Response to Encrypt:", JSON.stringify(screenResponse, null, 2));
 
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
