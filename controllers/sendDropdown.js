@@ -25,6 +25,35 @@ const SCREEN_RESPONSES = {
     }
   }
 };
+const flowWebhook = async (req, res) => {
+  if (!PRIVATE_KEY) {
+    throw new Error('Private key is empty. Please check env variable "PRIVATE_KEY".');
+  }
+
+  // Validate request signature
+  if (!isRequestSignatureValid(req)) {
+    return res.status(432).send();
+  }
+
+  let decryptedRequest;
+  try {
+    decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+  } catch (err) {
+    console.error("Decryption failed:", err);
+    if (err instanceof FlowEndpointException) {
+      return res.status(err.statusCode).send();
+    }
+    return res.status(500).send();
+  }
+
+  const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
+  console.log("💬 Decrypted Request:", JSON.stringify(decryptedBody, null, 2));
+
+  const screenResponse = await getNextScreen(decryptedBody);
+  console.log("👉 Response to Encrypt:", JSON.stringify(screenResponse, null, 2));
+
+  res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
+};
 
 // Helper to format date as YYYY-MM-DD
 const formatDate = (date) => date.toISOString().split("T")[0];
@@ -55,7 +84,7 @@ const getNextScreen = async (decryptedBody) => {
         trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
         calendar: {
           min_date: formatDate(today),
-          max_date: formatDate(maxDate),
+          max_date: null,
           init_value: {
             start_date: formatDate(today),
             end_date: formatDate(maxDate)
@@ -97,37 +126,6 @@ const getNextScreen = async (decryptedBody) => {
     screen: decryptedBody.screen || "FLIGHT_BOOKING_SCREEN",
     data: { acknowledged: true }
   };
-};
-
-// Flow webhook endpoint
-const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) {
-    throw new Error('Private key is empty. Please check env variable "PRIVATE_KEY".');
-  }
-
-  // Validate request signature
-  if (!isRequestSignatureValid(req)) {
-    return res.status(432).send();
-  }
-
-  let decryptedRequest;
-  try {
-    decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
-  } catch (err) {
-    console.error("Decryption failed:", err);
-    if (err instanceof FlowEndpointException) {
-      return res.status(err.statusCode).send();
-    }
-    return res.status(500).send();
-  }
-
-  const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-  console.log("💬 Decrypted Request:", JSON.stringify(decryptedBody, null, 2));
-
-  const screenResponse = await getNextScreen(decryptedBody);
-  console.log("👉 Response to Encrypt:", JSON.stringify(screenResponse, null, 2));
-
-  res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
 module.exports = { flowWebhook, getNextScreen };
