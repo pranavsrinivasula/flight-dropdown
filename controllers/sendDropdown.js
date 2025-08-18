@@ -53,8 +53,9 @@ const getNextScreen = async (decryptedBody) => {
 
   // Initial screen load
   if (action === "INIT") {
-    const today = new Date();
-    const todayStr = formatDate(today);
+    const today = new Date()
+    const currentDate = new Date();
+    const dateOnly = currentDate.toISOString().split('T')[0];
 
     const maxDate = new Date();
     maxDate.setDate(today.getDate() + 30);
@@ -64,11 +65,11 @@ const getNextScreen = async (decryptedBody) => {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
         calendar: {
-          "min-date": todayStr,
+          "min-date": today,
           "max-date": maxDateStr,
           "init-value": {
-            "start-date": todayStr,
-            "end-date": todayStr
+            "start-date": today,
+            "end-date": maxDateStr
           }
         },
         trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
