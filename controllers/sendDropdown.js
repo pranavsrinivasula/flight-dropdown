@@ -11,6 +11,11 @@ const SCREEN_RESPONSES = {
       trip_types: [
         { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
         { id: "HYD_TO_GOA", title: "HYD TO GOA" }
+      ],
+      cities: [
+        { id: "HYD", title: "Hyderabad" },
+        { id: "MUM", title: "Mumbai" },
+        { id: "GOA", title: "Goa" }
       ]
     }
   }
@@ -49,16 +54,17 @@ const getNextScreen = async (decryptedBody) => {
   // Ping request
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
+  const today = new Date();
+  const maxDate = new Date();
+  maxDate.setDate(today.getDate() + 365);
+
   // Initial screen load
   if (action === "INIT") {
-    const today = new Date();
-    const maxDate = new Date();
-    maxDate.setDate(today.getDate() + 365);
-
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
         trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
         calendar: {
           min_date: formatDate(today),
           max_date: formatDate(maxDate),
@@ -88,8 +94,24 @@ const getNextScreen = async (decryptedBody) => {
     };
   }
 
-  // Default fallback
-  return { screen: "FLIGHT_BOOKING_SCREEN", data: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data };
+  // Default fallback: return flight booking screen with full data
+  return {
+    screen: "FLIGHT_BOOKING_SCREEN",
+    data: {
+      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+      calendar: {
+        min_date: formatDate(today),
+        max_date: formatDate(maxDate),
+        init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+      },
+      DatePicker: {
+        min_date: formatDate(today),
+        max_date: formatDate(maxDate),
+        init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+      }
+    }
+  };
 };
 
 module.exports = { flowWebhook, getNextScreen };
