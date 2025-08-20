@@ -89,7 +89,16 @@ const getNextScreen = async (decryptedBody) => {
                     start_date: formatDate(today),
                     end_date: formatDate(maxDate)
                   }
-                }
+                },
+        DatePicker:
+        {
+           min_date: formatDate(today),
+                  max_date: formatDate(maxDate),
+                  init_value: {
+                    start_date: formatDate(today),
+                    end_date: formatDate(maxDate)
+                  }
+        }
       }
     };
   }
