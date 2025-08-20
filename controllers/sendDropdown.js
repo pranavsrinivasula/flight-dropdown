@@ -17,6 +17,7 @@ const SCREEN_RESPONSES = {
   SUMMARY_SCREEN: {
     screen: "SUMMARY_SCREEN",
     data: {
+      selected_trip: FLIGHT_BOOKING_SCREEN.data.trip_types,
       selected_dates: {
         start_date: "",
         end_date: ""
@@ -54,8 +55,10 @@ const flowWebhook = async (req, res) => {
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
+// Helper to format date as YYYY-MM-DD
 const formatDate = (date) => date.toISOString().split("T")[0];
 
+// Main logic to determine next screen
 const getNextScreen = async (decryptedBody) => {
   const { action, data } = decryptedBody;
 
@@ -75,41 +78,28 @@ const getNextScreen = async (decryptedBody) => {
     const maxDate = new Date();
     maxDate.setDate(today.getDate() + 365);
 
-if (action === "INIT") {
-  const today = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(today.getDate() + 30);
-
-  return {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-      calendar: {
-        min_date: formatDate(today),
-        max_date: formatDate(maxDate),
-        init_value: {
-          start_date: formatDate(today),
-          end_date: formatDate(maxDate),
-        },
-      },
-      DatePicker: {
-        min_date: formatDate(today),
-        max_date: formatDate(maxDate),
-        init_value: {
-          start_date: formatDate(today),
-          end_date: formatDate(maxDate),
-        },
-      },
-    },
-  };
-}
+    return {
+      screen: "FLIGHT_BOOKING_SCREEN",
+      data: {
+        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+       calendar: {
+                  min_date: formatDate(today),
+                  max_date: formatDate(maxDate),
+                  init_value: {
+                    start_date: formatDate(today),
+                    end_date: formatDate(maxDate)
+                  }
+                }
+      }
+    };
   }
 
-if (action === "data_exchange") {
 
-
+  // Data exchange triggers
+  if (action === "data_exchange") {
     const trigger = data?.trigger;
 
+    // Trip type selected → show summary
     if (trigger === "trip_type_selected") {
       return {
         screen: "SUMMARY_SCREEN",
@@ -121,6 +111,7 @@ if (action === "data_exchange") {
     }
 
 
+    // Load trip types again if needed
     if (trigger === "load_trip_types") {
       return {
         screen: "FLIGHT_BOOKING_SCREEN",
@@ -131,6 +122,7 @@ if (action === "data_exchange") {
     }
   }
 
+  // Default handler for unhandled requests
   console.warn("Unhandled request body:", decryptedBody);
   return {
     screen: decryptedBody.screen || "FLIGHT_BOOKING_SCREEN",
