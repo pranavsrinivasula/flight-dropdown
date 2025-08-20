@@ -80,19 +80,21 @@ const getNextScreen = async (decryptedBody) => {
   }
 
   // User submits flight selection
-  if (action === "data_exchange" && data?.trigger === "submit_flight") {
-    const { from_city, to_city, Startdate, Enddate } = data;
+if (action === "data_exchange" && data?.trigger === "submit_flight") {
+  const { from_city, to_city, Startdate, Enddate } = data;
 
-    return {
-      screen: "SUMMARY_SCREEN",
-      data: {
-        from_city: from_city || "",
-        to_city: to_city || "",
-        Startdate: Startdate || "",
-        Enddate: Enddate || ""
-      }
-    };
-  }
+  return {
+    screen: "SUMMARY_SCREEN",
+    data: {
+      from_city: from_city || "",
+      to_city: to_city || "",
+      Startdate: Startdate || "",
+      Enddate: Enddate || ""
+    }
+  };
+
+}
+
 
   // Default fallback: return flight booking screen with full data
   return {
