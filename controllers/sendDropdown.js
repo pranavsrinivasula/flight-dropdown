@@ -8,15 +8,19 @@ const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
-      trip_types: [
-        { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
-        { id: "HYD_TO_GOA", title: "HYD TO GOA" }
+      cities: [
+        { id: "HYD", title: "Hyderabad" },
+        { id: "MUM", title: "Mumbai" },
+        { id: "GOA", title: "Goa" },
+        { id: "DEL", title: "Delhi" }
       ]
     }
   },
   SUMMARY_SCREEN: {
     screen: "SUMMARY_SCREEN",
     data: {
+      from_city: "",
+      to_city: "",
       selected_dates: {
         start_date: "",
         end_date: ""
@@ -24,6 +28,7 @@ const SCREEN_RESPONSES = {
     }
   }
 };
+
 const flowWebhook = async (req, res) => {
   if (!PRIVATE_KEY) {
     throw new Error('Private key is empty. Please check env variable "PRIVATE_KEY".');
@@ -80,51 +85,73 @@ const getNextScreen = async (decryptedBody) => {
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-       calendar: {
-                  min_date: formatDate(today),
-                  max_date: formatDate(maxDate),
-                  init_value: {
-                    start_date: formatDate(today),
-                    end_date: formatDate(maxDate)
-                  }
-                },
-        DatePicker:
-        {
-           min_date: formatDate(today),
-                  max_date: formatDate(maxDate),
-                  init_value: {
-                    start_date: formatDate(today),
-                    end_date: formatDate(maxDate)
-                  }
+        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+        calendar: {
+          min_date: formatDate(today),
+          max_date: formatDate(maxDate),
+          init_value: {
+            start_date: formatDate(today),
+            end_date: formatDate(maxDate)
+          }
         },
+        DatePicker: {
+          min_date: formatDate(today),
+          max_date: formatDate(maxDate),
+          init_value: {
+            start_date: formatDate(today),
+            end_date: formatDate(maxDate)
+          }
+        }
       }
     };
   }
-
 
   // Data exchange triggers
   if (action === "data_exchange") {
     const trigger = data?.trigger;
 
-    // Trip type selected → show summary
-    if (trigger === "trip_type_selected") {
+    // ✅ User selected both cities → go to summary
+    if (trigger === "city_selection_done") {
       return {
         screen: "SUMMARY_SCREEN",
         data: {
-          selected_trip: data?.selected_trip || SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types[0].title,
+          from_city: data?.from_city || "",
+          to_city: data?.to_city || "",
           selected_dates: data?.selected_dates || { start_date: "", end_date: "" }
         }
       };
     }
 
+    // User picked Start Date → update End Date constraints
+    if (trigger === "start_date_selected") {
+      const selectedStart = data?.selected_start;
 
-    // Load trip types again if needed
-    if (trigger === "load_trip_types") {
+      if (!selectedStart) {
+        return {
+          screen: "FLIGHT_BOOKING_SCREEN",
+          data: {
+            error: "Start Date missing"
+          }
+        };
+      }
+
       return {
         screen: "FLIGHT_BOOKING_SCREEN",
         data: {
-          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
+          DatePicker: {
+            min_date: selectedStart,
+            max_date: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.max_date || null
+          }
+        }
+      };
+    }
+
+    // Load cities again if needed
+    if (trigger === "load_cities") {
+      return {
+        screen: "FLIGHT_BOOKING_SCREEN",
+        data: {
+          cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities
         }
       };
     }
