@@ -97,7 +97,7 @@ const getNextScreen = async (decryptedBody) => {
                     start_date: formatDate(today),
                     end_date: formatDate(maxDate)
                   }
-        }
+        },
       }
     };
   }
