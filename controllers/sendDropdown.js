@@ -13,37 +13,20 @@ const SCREEN_RESPONSES = {
         { id: "HYD_TO_GOA", title: "HYD TO GOA" }
       ]
     }
-  },
-  SUMMARY_SCREEN: {
-     data: {  // <-- use data instead of form
-      from_city: from_city || "",
-      to_city: to_city || "",
-      Startdate: Startdate || "",
-      Enddate: Enddate || ""
-    
-    }
   }
 };
 
-
 const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) {
-    throw new Error('Private key is empty. Please check env variable "PRIVATE_KEY".');
-  }
+  if (!PRIVATE_KEY) throw new Error('Private key is empty');
 
-  // Validate request signature
-  if (!isRequestSignatureValid(req)) {
-    return res.status(432).send();
-  }
+  if (!isRequestSignatureValid(req)) return res.status(432).send();
 
   let decryptedRequest;
   try {
     decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
   } catch (err) {
     console.error("Decryption failed:", err);
-    if (err instanceof FlowEndpointException) {
-      return res.status(err.statusCode).send();
-    }
+    if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
     return res.status(500).send();
   }
 
@@ -56,25 +39,15 @@ const flowWebhook = async (req, res) => {
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
-
-
-
 // Helper to format date as YYYY-MM-DD
 const formatDate = (date) => date.toISOString().split("T")[0];
 
-// Main logic to determine next screen
+// Main logic
 const getNextScreen = async (decryptedBody) => {
   const { action, data } = decryptedBody;
 
   // Ping request
-  if (action === "ping") {
-    return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
-  }
-
-  // Error handling
-  if (data?.error) {
-    return { screen: decryptedBody.screen || "FLIGHT_BOOKING_SCREEN", data: { acknowledged: true } };
-  }
+  if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
   // Initial screen load
   if (action === "INIT") {
@@ -86,85 +59,37 @@ const getNextScreen = async (decryptedBody) => {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
         trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-       calendar: {
-                  min_date: formatDate(today),
-                  max_date: formatDate(maxDate),
-                  init_value: {
-                    start_date: formatDate(today),
-                    end_date: formatDate(maxDate)
-                  }
-                },
-        DatePicker:
-        {
-            min_date: formatDate(today),
-            max_date: formatDate(maxDate),
-            init_value: {
-              start_date: formatDate(today),
-              end_date: formatDate(maxDate)
-                  }
+        calendar: {
+          min_date: formatDate(today),
+          max_date: formatDate(maxDate),
+          init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
         },
+        DatePicker: {
+          min_date: formatDate(today),
+          max_date: formatDate(maxDate),
+          init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+        }
       }
     };
   }
 
+  // User submits flight selection
+  if (action === "data_exchange" && data?.trigger === "submit_flight") {
+    const { from_city, to_city, Startdate, Enddate } = data;
 
-
-  // Data exchange triggers
-  if (action === "data_exchange") {
-    const trigger = data?.trigger;
-
-    // Trip type selected → show summary
-    if (trigger === "trip_type_selected") {
-      return {
-        screen: "SUMMARY_SCREEN",
-        data: {
-          selected_trip: data?.selected_trip || SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types[0].title,
-          selected_dates: data?.selected_dates || { start_date: "", end_date: "" }
-        }
-      };
-    }
-// User picked Start Date → update End Date constraints
-if (trigger === "start_date_selected") {
-  const selectedStart = data?.selected_start;
-
-  if (!selectedStart) {
     return {
-      screen: "FLIGHT_BOOKING_SCREEN",
+      screen: "SUMMARY_SCREEN",
       data: {
-        error: "Start Date missing"
+        from_city: from_city || "",
+        to_city: to_city || "",
+        Startdate: Startdate || "",
+        Enddate: Enddate || ""
       }
     };
   }
 
-  return {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      DatePicker: {
-        min_date: selectedStart, // 
-        max_date: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.max_date || null
-      }
-    }
-  };
-}
-
-
-    // Load trip types again if needed
-    if (trigger === "load_trip_types") {
-      return {
-        screen: "FLIGHT_BOOKING_SCREEN",
-        data: {
-          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types
-        }
-      };
-    }
-  }
-
-  // Default handler for unhandled requests
-  console.warn("Unhandled request body:", decryptedBody);
-  return {
-    screen: decryptedBody.screen || "FLIGHT_BOOKING_SCREEN",
-    data: { acknowledged: true }
-  };
+  // Default fallback
+  return { screen: "FLIGHT_BOOKING_SCREEN", data: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data };
 };
 
 module.exports = { flowWebhook, getNextScreen };
