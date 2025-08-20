@@ -84,12 +84,11 @@ const getNextScreen = async (decryptedBody) => {
   }
 
   // When user submits the flight selection
-  if (action === "data_exchange" && data?.trigger === "submit_flight") {
-    const { from_city, to_city, Startdate, Enddate } = data;
-
+if (action === "data_exchange" && data?.trigger === "submit_flight") {
+  const { from_city, to_city, Startdate, Enddate } = data;
   return {
   screen: "SUMMARY_SCREEN",
-  form: {  // <-- send under form instead of data
+   data: {  
     from_city: from_city || "",
     to_city: to_city || "",
     Startdate: Startdate || "",
