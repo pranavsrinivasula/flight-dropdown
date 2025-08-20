@@ -17,7 +17,6 @@ const SCREEN_RESPONSES = {
   SUMMARY_SCREEN: {
     screen: "SUMMARY_SCREEN",
     data: {
-      selected_trip: FLIGHT_BOOKING_SCREEN.data.trip_types,
       selected_dates: {
         start_date: "",
         end_date: ""
