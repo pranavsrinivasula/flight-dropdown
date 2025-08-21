@@ -22,7 +22,7 @@ const SCREEN_RESPONSES = {
 };
 
 const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) throw new Error('Private key is empty');
+  if (!PRIVATE_KEY) throw new Error("Private key is empty");
 
   if (!isRequestSignatureValid(req)) return res.status(432).send();
 
@@ -79,7 +79,7 @@ const getNextScreen = async (decryptedBody) => {
     };
   }
 
-  // User submits flight selection
+  // Handle user data exchange
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
@@ -100,7 +100,21 @@ const getNextScreen = async (decryptedBody) => {
         };
 
       default:
-        break;
+        return {
+          screen: "FLIGHT_BOOKING_SCREEN",
+          data: {
+            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+            calendar: {
+              min_date: formatDate(today),
+              max_date: formatDate(maxDate),
+              init_value: {
+                start_date: formatDate(today),
+                end_date: formatDate(maxDate)
+              }
+            }
+          }
+        };
     }
   }
 
@@ -121,6 +135,5 @@ const getNextScreen = async (decryptedBody) => {
     }
   };
 };
-
 
 module.exports = { flowWebhook, getNextScreen };
