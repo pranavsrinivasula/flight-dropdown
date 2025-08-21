@@ -102,10 +102,10 @@ const getNextScreen = async (decryptedBody) => {
           data: {
             message: "Booking flow complete.",
             trip_summary: {
-              from_city: data.from_city,
-              to_city: data.to_city,
-              Startdate: data.Startdate,
-              Enddate: data.Enddate
+              from_city: data.FLIGHT_BOOKING_SCREEN.from_city,
+              to_city: data.FLIGHT_BOOKING_SCREEN.to_city,
+              Startdate: data.FLIGHT_BOOKING_SCREEN.Startdate,
+              Enddate: data.FLIGHT_BOOKING_SCREEN.Enddate
             }
           }
         };
