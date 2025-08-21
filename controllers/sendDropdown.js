@@ -48,6 +48,7 @@ const flowWebhook = async (req, res) => {
 const formatDate = (date) => date.toISOString().split("T")[0];
 
 // Main logic
+// Main logic
 const getNextScreen = async (decryptedBody) => {
   const { action, screen, data } = decryptedBody;
 
@@ -83,20 +84,30 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
+        // After filling flight booking form -> Go to summary
         return {
           screen: "SUMMARY_SCREEN",
           data: {
-            from_city: data.from_city || "",
-            to_city: data.to_city || "",
-            Startdate: data.Startdate || "",
-            Enddate: data.Enddate || ""
+            from_city: data.from_city || "Not selected",
+            to_city: data.to_city || "Not selected",
+            Startdate: data.Startdate || "Not selected",
+            Enddate: data.Enddate || "Not selected"
           }
         };
 
       case "SUMMARY_SCREEN":
+        // After summary -> Complete
         return {
           screen: "TERMINAL_SCREEN",
-          data: {}
+          data: {
+            message: "Booking flow complete.",
+            trip_summary: {
+              from_city: data.from_city,
+              to_city: data.to_city,
+              Startdate: data.Startdate,
+              Enddate: data.Enddate
+            }
+          }
         };
 
       default:
@@ -135,5 +146,6 @@ const getNextScreen = async (decryptedBody) => {
     }
   };
 };
+
 
 module.exports = { flowWebhook, getNextScreen };
