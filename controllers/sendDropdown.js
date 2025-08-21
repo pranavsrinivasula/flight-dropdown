@@ -48,92 +48,38 @@ const flowWebhook = async (req, res) => {
 const formatDate = (date) => date.toISOString().split("T")[0];
 
 // Main logic
-const getNextScreen = async (decryptedBody) => {
-  const { action, screen, data } = decryptedBody;
-
-  // Ping request
-  if (action === "ping") {
-    return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
-  }
-
-  const today = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(today.getDate() + 365);
-
-  // Initial screen load
+function getNextScreen(action, screen, data) {
   if (action === "INIT") {
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-        calendar: {
-          min_date: formatDate(today),
-          max_date: formatDate(maxDate),
-          init_value: {
-            start_date: formatDate(today),
-            end_date: formatDate(maxDate)
-          }
-        }
+        from_city: "",
+        to_city: "",
+        Startdate: "",
+        Enddate: ""
       }
     };
   }
 
-  // Handle user data exchange
-  if (action === "data_exchange") {
-    switch (screen) {
-      case "FLIGHT_BOOKING_SCREEN":
-        return {
-          screen: "SUMMARY_SCREEN",
-          data: {
-            from_city: data.from_city || "",
-            to_city: data.to_city || "",
-            Startdate: data.Startdate || "",
-            Enddate: data.Enddate || ""
-          }
-        };
-
-      case "SUMMARY_SCREEN":
-        return {
-          screen: "TERMINAL_SCREEN",
-          data: {}
-        };
-
-      default:
-        return {
-          screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-            calendar: {
-              min_date: formatDate(today),
-              max_date: formatDate(maxDate),
-              init_value: {
-                start_date: formatDate(today),
-                end_date: formatDate(maxDate)
-              }
-            }
-          }
-        };
-    }
+  if (screen === "FLIGHT_BOOKING_SCREEN" && action === "data_exchange") {
+    return {
+      screen: "SUMMARY_SCREEN",
+      data: {
+        from_city: data.from_city || "Not selected",
+        to_city: data.to_city || "Not selected",
+        Startdate: data.Startdate || "Not selected",
+        Enddate: data.Enddate || "Not selected"
+      }
+    };
   }
 
-  // Default fallback
   return {
-    screen: "FLIGHT_BOOKING_SCREEN",
+    screen: "TERMINAL_SCREEN",
     data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-      calendar: {
-        min_date: formatDate(today),
-        max_date: formatDate(maxDate),
-        init_value: {
-          start_date: formatDate(today),
-          end_date: formatDate(maxDate)
-        }
-      }
+      message: "Booking flow complete."
     }
   };
-};
+}
+
 
 module.exports = { flowWebhook, getNextScreen };
