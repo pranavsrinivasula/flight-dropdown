@@ -49,10 +49,12 @@ const formatDate = (date) => date.toISOString().split("T")[0];
 
 // Main logic
 const getNextScreen = async (decryptedBody) => {
-  const { action, data } = decryptedBody;
+  const { action, screen, data } = decryptedBody;
 
   // Ping request
-  if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
+  if (action === "ping") {
+    return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
+  }
 
   const today = new Date();
   const maxDate = new Date();
@@ -68,35 +70,41 @@ const getNextScreen = async (decryptedBody) => {
         calendar: {
           min_date: formatDate(today),
           max_date: formatDate(maxDate),
-          init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
-        },
-        DatePicker: {
-          min_date: formatDate(today),
-          max_date: formatDate(maxDate),
-          init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+          init_value: {
+            start_date: formatDate(today),
+            end_date: formatDate(maxDate)
+          }
         }
       }
     };
   }
 
   // User submits flight selection
-if (action === "data_exchange" && data?.trigger === "submit_flight") {
-  const { from_city, to_city, Startdate, Enddate } = data;
+  if (action === "data_exchange") {
+    switch (screen) {
+      case "FLIGHT_BOOKING_SCREEN":
+        return {
+          screen: "SUMMARY_SCREEN",
+          data: {
+            from_city: data.from_city || "",
+            to_city: data.to_city || "",
+            Startdate: data.Startdate || "",
+            Enddate: data.Enddate || ""
+          }
+        };
 
-  return {
-    screen: "SUMMARY_SCREEN",
-    data: {
-      from_city: from_city || "",
-      to_city: to_city || "",
-      Startdate: Startdate || "",
-      Enddate: Enddate || ""
+      case "SUMMARY_SCREEN":
+        return {
+          screen: "TERMINAL_SCREEN",
+          data: {}
+        };
+
+      default:
+        break;
     }
-  };
+  }
 
-}
-
-
-  // Default fallback: return flight booking screen with full data
+  // Default fallback
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
@@ -105,15 +113,14 @@ if (action === "data_exchange" && data?.trigger === "submit_flight") {
       calendar: {
         min_date: formatDate(today),
         max_date: formatDate(maxDate),
-        init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
-      },
-      DatePicker: {
-        min_date: formatDate(today),
-        max_date: formatDate(maxDate),
-        init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+        init_value: {
+          start_date: formatDate(today),
+          end_date: formatDate(maxDate)
+        }
       }
     }
   };
 };
+
 
 module.exports = { flowWebhook, getNextScreen };
