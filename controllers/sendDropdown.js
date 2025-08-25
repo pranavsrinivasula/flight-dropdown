@@ -130,7 +130,6 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
-  // Fallback: initial screen
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
