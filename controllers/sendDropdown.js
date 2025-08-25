@@ -94,27 +94,32 @@ const getNextScreen = async (decryptedBody) => {
           }
         };
 
-          case "SUMMARY_SCREEN":
-          await Booking.create({
-            from_city: data.from_city || "Not selected",
-            to_city: data.to_city || "Not selected",
-            start_date: data.Startdate || "Not selected",
-            end_date: data.Enddate || "Not selected"
-          });
-
-          return {
-            screen: "TERMINAL_SCREEN",
-            data: {
-              message: "Booking flow complete.",
-              trip_summary: {
-                from_city: data.from_city,
-                to_city: data.to_city,
-                Startdate: data.Startdate,
-                Enddate: data.Enddate
+              case "SUMMARY_SCREEN":
+              try {
+                await Booking.create({
+                  from_city: data.from_city,
+                  to_city: data.to_city,     
+                  start_date: data.Startdate,  
+                  end_date: data.Enddate       
+                 
+                });
+                console.log("✅ Booking saved successfully!");
+              } catch (err) {
+                console.error("❌ Error saving booking:", err);
               }
-            }
-          };
 
+              return {
+                screen: "TERMINAL_SCREEN",
+                data: {
+                  message: "Booking flow complete",
+                  trip_summary: {
+                    from_city: data.from_city,
+                    to_city: data.to_city,
+                    Startdate: data.Startdate,
+                    Enddate: data.Enddate
+                  }
+                }
+  };
             default:
                 return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
             }
