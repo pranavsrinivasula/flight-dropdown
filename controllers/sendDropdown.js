@@ -2,8 +2,9 @@ const { decryptRequest, encryptResponse, FlowEndpointException } = require("../m
 const { isRequestSignatureValid } = require("../middleware/valid");
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
+const Booking = require("../models/Booking");
 
-// Predefined screens and data
+ 
 const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
     screen: "FLIGHT_BOOKING_SCREEN",
@@ -20,6 +21,8 @@ const SCREEN_RESPONSES = {
     }
   }
 };
+
+
 
 const flowWebhook = async (req, res) => {
   if (!PRIVATE_KEY) throw new Error("Private key is empty");
@@ -44,15 +47,12 @@ const flowWebhook = async (req, res) => {
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
-// Helper to format date as YYYY-MM-DD
 const formatDate = (date) => date.toISOString().split("T")[0];
 
-// Main logic
-// Main logic
+
 const getNextScreen = async (decryptedBody) => {
   const { action, screen, data } = decryptedBody;
 
-  // Ping request
   if (action === "ping") {
     return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
   }
@@ -61,7 +61,6 @@ const getNextScreen = async (decryptedBody) => {
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
-  // Initial screen load
   if (action === "INIT") {
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
@@ -80,11 +79,11 @@ const getNextScreen = async (decryptedBody) => {
     };
   }
 
-  // Handle user data exchange
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        // After filling flight booking form -> Go to summary
+      
+   
         return {
           screen: "SUMMARY_SCREEN",
           data: {
@@ -95,41 +94,32 @@ const getNextScreen = async (decryptedBody) => {
           }
         };
 
-      case "SUMMARY_SCREEN":
-        // After summary -> Complete
-        return {
-          screen: "TERMINAL_SCREEN",
-          data: {
-            message: "Booking flow complete.",
-            trip_summary: {
-              from_city: data.FLIGHT_BOOKING_SCREEN.from_city,
-              to_city: data.FLIGHT_BOOKING_SCREEN.to_city,
-              Startdate: data.FLIGHT_BOOKING_SCREEN.Startdate,
-              Enddate: data.FLIGHT_BOOKING_SCREEN.Enddate
-            }
-          }
-        };
+          case "SUMMARY_SCREEN":
+          await Booking.create({
+            from_city: data.from_city || "Not selected",
+            to_city: data.to_city || "Not selected",
+            start_date: data.Startdate || "Not selected",
+            end_date: data.Enddate || "Not selected"
+          });
 
-      default:
-        return {
-          screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-            calendar: {
-              min_date: formatDate(today),
-              max_date: formatDate(maxDate),
-              init_value: {
-                start_date: formatDate(today),
-                end_date: formatDate(maxDate)
+          return {
+            screen: "TERMINAL_SCREEN",
+            data: {
+              message: "Booking flow complete.",
+              trip_summary: {
+                from_city: data.from_city,
+                to_city: data.to_city,
+                Startdate: data.Startdate,
+                Enddate: data.Enddate
               }
             }
-          }
-        };
-    }
-  }
+          };
 
-  // Default fallback
+            default:
+                return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
+            }
+          }
+
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
@@ -141,11 +131,13 @@ const getNextScreen = async (decryptedBody) => {
         init_value: {
           start_date: formatDate(today),
           end_date: formatDate(maxDate)
-        }
+        },
+        
       }
     }
   };
 };
+
 
 
 module.exports = { flowWebhook, getNextScreen };

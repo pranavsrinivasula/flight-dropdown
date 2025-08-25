@@ -3,6 +3,10 @@ const flowRoutes = require("./Routes/routes");
 const app = express();
 const cors = require('cors');
 const bodyParser = require('body-parser')
+const mongoose = require("mongoose");
+require("dotenv").config();
+
+
 const PORT = process.env.PORT || 3000
 app.use(
   express.json({
@@ -32,3 +36,8 @@ app.listen(PORT, async () => {
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
 })
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ Connected to MongoDB"))
+  .catch(err => console.error("❌ Mongo error:", err));
