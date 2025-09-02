@@ -132,6 +132,16 @@ const getNextScreen = async (decryptedBody) => {
   // Dynamically set Enddate min-date
   const enddate_min = data?.Startdate || formatDate(today);
 
+
+// If Startdate is selected, allow Enddate >= Startdate
+if (data?.Startdate) {
+  enddate_min = data.Startdate;
+} else {
+  // If Startdate not selected, set min-date after max_date (user cannot select anything)
+  const future = new Date();
+  future.setDate(today.getDate() + 366); // out of range
+  enddate_min = future.toISOString().split("T")[0];
+}
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
