@@ -1,4 +1,3 @@
-// flowController.js
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 const { isRequestSignatureValid } = require("../middleware/valid");
 const mongoose = require("mongoose");
@@ -77,7 +76,8 @@ const getNextScreen = async (decryptedBody) => {
           min_date: formatDate(today),
           max_date: formatDate(maxDate),
           init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
-        }
+        },
+        startdate_selected: false
       }
     };
   }
@@ -97,7 +97,6 @@ const getNextScreen = async (decryptedBody) => {
         };
 
       case "SUMMARY_SCREEN":
-        // Save booking to MongoDB
         try {
           const bookingData = {
             from_city: data.from_city || "Not selected",
@@ -130,6 +129,9 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
+  // If Startdate exists, mark the boolean
+  const startdate_selected = !!data?.Startdate;
+
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
@@ -139,7 +141,8 @@ const getNextScreen = async (decryptedBody) => {
         min_date: formatDate(today),
         max_date: formatDate(maxDate),
         init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
-      }
+      },
+      startdate_selected
     }
   };
 };
