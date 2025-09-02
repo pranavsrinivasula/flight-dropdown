@@ -3,31 +3,15 @@ const { decryptRequest, encryptResponse, FlowEndpointException } = require("../m
 const { isRequestSignatureValid } = require("../middleware/valid");
 const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
+require("dotenv").config();
+
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
-require("dotenv").config();
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Atlas connected!"))
   .catch(err => console.error("❌ Mongo error:", err));
-
-const SCREEN_RESPONSES = {
-  FLIGHT_BOOKING_SCREEN: {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: [
-        { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
-        { id: "HYD_TO_GOA", title: "HYD TO GOA" }
-      ],
-      cities: [
-        { id: "HYD", title: "Hyderabad" },
-        { id: "MUM", title: "Mumbai" },
-        { id: "GOA", title: "Goa" }
-      ]
-    }
-  }
-};
 
 // Helper to format dates
 const formatDate = (date) => date.toISOString().split("T")[0];
@@ -35,7 +19,6 @@ const formatDate = (date) => date.toISOString().split("T")[0];
 // Flow Webhook
 const flowWebhook = async (req, res) => {
   if (!PRIVATE_KEY) throw new Error("Private key is empty");
-
   if (!isRequestSignatureValid(req)) return res.status(432).send();
 
   let decryptedRequest;
@@ -71,13 +54,16 @@ const getNextScreen = async (decryptedBody) => {
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+        cities: [
+          { id: "HYD", title: "Hyderabad" },
+          { id: "MUM", title: "Mumbai" },
+          { id: "GOA", title: "Goa" }
+        ],
         calendar: {
           min_date: formatDate(today),
-          max_date: formatDate(maxDate),
-          init_value: { start_date: null, end_date: null } // Start empty
-        }
+          max_date: formatDate(maxDate)
+        },
+        enddate_enabled: { value: false } // Enddate disabled initially
       }
     };
   }
@@ -89,56 +75,22 @@ const getNextScreen = async (decryptedBody) => {
         return {
           screen: "SUMMARY_SCREEN",
           data: {
-            from_city: data.from_city || "Not selected",
-            to_city: data.to_city || "Not selected",
-            Startdate: data.Startdate || null,
-            Enddate: data.Enddate || null
+            from_city: { id: data.from_city, title: data.from_city },
+            to_city: { id: data.to_city, title: data.to_city },
+            Startdate: { value: data.Startdate },
+            Enddate: { value: data.Enddate || data.Startdate },
           }
         };
 
       case "SUMMARY_SCREEN":
         try {
-          // Validate dates
-          if (!data.Startdate) {
-            return {
-              screen: "FLIGHT_BOOKING_SCREEN",
-              data: {
-                error: "Startdate is required",
-                trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-                cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-                calendar: {
-                  min_date: formatDate(today),
-                  max_date: formatDate(maxDate),
-                  init_value: { start_date: null, end_date: null }
-                }
-              }
-            };
-          }
-
-          if (data.Enddate && new Date(data.Enddate) < new Date(data.Startdate)) {
-            return {
-              screen: "FLIGHT_BOOKING_SCREEN",
-              data: {
-                error: "Enddate cannot be before Startdate",
-                trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-                cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-                calendar: {
-                  min_date: formatDate(today),
-                  max_date: formatDate(maxDate),
-                  init_value: { start_date: data.Startdate, end_date: null }
-                }
-              }
-            };
-          }
-
           const bookingData = {
-            from_city: data.from_city || "Not selected",
-            to_city: data.to_city || "Not selected",
-            start_date: data.Startdate,
-            end_date: data.Enddate || data.Startdate, // Default Enddate = Startdate
+            from_city: data.from_city.title,
+            to_city: data.to_city.title,
+            start_date: data.Startdate.value,
+            end_date: data.Enddate.value,
             phone_number: "6301015711"
           };
-
           const saved = await Booking.create(bookingData);
           console.log("✅ Booking saved:", saved);
         } catch (err) {
@@ -150,32 +102,21 @@ const getNextScreen = async (decryptedBody) => {
           data: {
             message: "Booking flow complete",
             trip_summary: {
-              from_city: data.from_city,
-              to_city: data.to_city,
-              Startdate: data.Startdate,
-              Enddate: data.Enddate
+              from_city: data.from_city.title,
+              to_city: data.to_city.title,
+              Startdate: data.Startdate.value,
+              Enddate: data.Enddate.value
             }
           }
         };
 
       default:
-        return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
+        return { screen: "FLIGHT_BOOKING_SCREEN", data: {} };
     }
   }
 
   // Default fallback
-  return {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-      calendar: {
-        min_date: formatDate(today),
-        max_date: formatDate(maxDate),
-        init_value: { start_date: null, end_date: null }
-      }
-    }
-  };
+  return { screen: "FLIGHT_BOOKING_SCREEN", data: {} };
 };
 
 module.exports = { flowWebhook, getNextScreen };
