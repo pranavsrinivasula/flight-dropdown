@@ -2,9 +2,10 @@ const { decryptRequest, encryptResponse, FlowEndpointException } = require("../m
 const { isRequestSignatureValid } = require("../middleware/valid");
 const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
+require("dotenv").config();
+
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
-require("dotenv").config();
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
@@ -67,6 +68,8 @@ const getNextScreen = async (decryptedBody) => {
 
   // Initial load
   if (action === "INIT") {
+    const blockDate = new Date();
+    blockDate.setDate(maxDate.getDate() + 1); // block Enddate initially
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
@@ -77,7 +80,7 @@ const getNextScreen = async (decryptedBody) => {
           max_date: formatDate(maxDate),
           init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
         },
-        enddate_min: formatDate(today)
+        enddate_min: blockDate.toISOString().split("T")[0]
       }
     };
   }
@@ -86,8 +89,10 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        // If Startdate not selected, send FLIGHT_BOOKING_SCREEN back with blocked Enddate
+        // If Startdate not selected → reload screen with blocked Enddate
         if (!data.Startdate) {
+          const blockDate = new Date();
+          blockDate.setDate(maxDate.getDate() + 1);
           return {
             screen: "FLIGHT_BOOKING_SCREEN",
             data: {
@@ -98,19 +103,23 @@ const getNextScreen = async (decryptedBody) => {
                 max_date: formatDate(maxDate),
                 init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
               },
-              enddate_min: new Date(maxDate.getTime() + 86400000).toISOString().split("T")[0] // block Enddate
+              enddate_min: blockDate.toISOString().split("T")[0]
             }
           };
         }
 
-        // Startdate selected -> go to summary
+        // Startdate selected → Enddate min = Startdate
         return {
-          screen: "SUMMARY_SCREEN",
+          screen: "FLIGHT_BOOKING_SCREEN",
           data: {
-            from_city: data.from_city || "Not selected",
-            to_city: data.to_city || "Not selected",
-            Startdate: data.Startdate || "Not selected",
-            Enddate: data.Enddate || "Not selected"
+            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+            calendar: {
+              min_date: formatDate(today),
+              max_date: formatDate(maxDate),
+              init_value: { start_date: data.Startdate, end_date: data.Enddate || formatDate(maxDate) }
+            },
+            enddate_min: data.Startdate
           }
         };
 
@@ -123,7 +132,8 @@ const getNextScreen = async (decryptedBody) => {
             end_date: data.Enddate || "Not selected",
             phone_number: "6301015711"
           };
-          await Booking.create(bookingData);
+          const saved = await Booking.create(bookingData);
+          console.log("✅ Booking saved:", saved);
         } catch (err) {
           console.error("❌ Error saving booking:", err);
         }
@@ -140,15 +150,12 @@ const getNextScreen = async (decryptedBody) => {
             }
           }
         };
-
-      default:
-        break;
     }
   }
 
-  // Default FLIGHT_BOOKING_SCREEN reload
-  let enddate_min = data?.Startdate ? data.Startdate : new Date(maxDate.getTime() + 86400000).toISOString().split("T")[0];
-
+  // Default fallback
+  const blockDate = new Date();
+  blockDate.setDate(maxDate.getDate() + 1);
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
@@ -159,10 +166,9 @@ const getNextScreen = async (decryptedBody) => {
         max_date: formatDate(maxDate),
         init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
       },
-      enddate_min
+      enddate_min: blockDate.toISOString().split("T")[0]
     }
   };
 };
-
 
 module.exports = { flowWebhook, getNextScreen };
