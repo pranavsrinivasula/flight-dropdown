@@ -77,7 +77,7 @@ const getNextScreen = async (decryptedBody) => {
           max_date: formatDate(maxDate),
           init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
         },
-        startdate_selected: false
+        enddate_min: formatDate(today)
       }
     };
   }
@@ -125,12 +125,12 @@ const getNextScreen = async (decryptedBody) => {
         };
 
       default:
-        return SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN;
+        break;
     }
   }
 
-  // If Startdate exists, mark the boolean
-  const startdate_selected = !!data?.Startdate;
+  // Dynamically set Enddate min-date
+  const enddate_min = data?.Startdate || formatDate(today);
 
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
@@ -142,7 +142,7 @@ const getNextScreen = async (decryptedBody) => {
         max_date: formatDate(maxDate),
         init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
       },
-      startdate_selected
+      enddate_min
     }
   };
 };
