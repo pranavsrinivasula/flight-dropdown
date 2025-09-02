@@ -38,15 +38,8 @@ const buildFlightBookingScreen = (startDate, endDate) => {
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
-  // If Startdate not selected → block Enddate
-  const enddate_min = startDate
-    ? { date: startDate }
-    : { date: (() => {
-        const blockDate = new Date();
-        blockDate.setDate(today.getDate() + 366); // beyond maxDate
-        return blockDate.toISOString().split("T")[0];
-      })()
-    };
+  // enddate_min must be string
+  const enddate_min = startDate ? startDate : formatDate(new Date(today.getTime() + 86400000)); // tomorrow if no startDate
 
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
@@ -57,8 +50,8 @@ const buildFlightBookingScreen = (startDate, endDate) => {
         min_date: formatDate(today),
         max_date: formatDate(maxDate),
         init_value: {
-          start_date: startDate ? startDate : formatDate(today),
-          end_date: endDate ? endDate : formatDate(maxDate)
+          start_date: startDate || formatDate(today),
+          end_date: endDate || formatDate(maxDate)
         }
       },
       enddate_min
@@ -94,8 +87,6 @@ const flowWebhook = async (req, res) => {
 const getNextScreen = async (decryptedBody) => {
   const { action, screen, data } = decryptedBody;
 
-  const today = formatDate(new Date());
-
   // Ping check
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
@@ -107,23 +98,24 @@ const getNextScreen = async (decryptedBody) => {
   // Handle form submissions
   if (action === "data_exchange") {
     switch (screen) {
-      case "FLIGHT_BOOKING_SCREEN":
-        const startDate = data.Startdate?.date || null;
-        const endDate = data.Enddate?.date || null;
+      case "FLIGHT_BOOKING_SCREEN": {
+        const startDate = data.Startdate || null;
+        const endDate = data.Enddate || null;
 
         // Reload screen if Startdate not selected
         if (!startDate) return buildFlightBookingScreen(null, null);
 
         // Startdate selected → Enddate min = Startdate
         return buildFlightBookingScreen(startDate, endDate);
+      }
 
-      case "SUMMARY_SCREEN":
+      case "SUMMARY_SCREEN": {
         try {
           const bookingData = {
             from_city: data.from_city || { id: "HYD", title: "Hyderabad" },
             to_city: data.to_city || { id: "MUM", title: "Mumbai" },
-            start_date: data.Startdate?.date || "Not selected",
-            end_date: data.Enddate?.date || "Not selected",
+            start_date: data.Startdate || "Not selected",
+            end_date: data.Enddate || "Not selected",
             phone_number: "6301015711"
           };
           const saved = await Booking.create(bookingData);
@@ -144,6 +136,7 @@ const getNextScreen = async (decryptedBody) => {
             }
           }
         };
+      }
     }
   }
 
