@@ -12,49 +12,58 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Atlas connected!"))
   .catch(err => console.error("❌ Mongo error:", err));
 
-const SCREEN_RESPONSES = {
-  FLIGHT_BOOKING_SCREEN: {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: [
-        { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
-        { id: "HYD_TO_GOA", title: "HYD TO GOA" }
-      ],
-      cities: [
-        { id: "HYD", title: "Hyderabad" },
-        { id: "MUM", title: "Mumbai" },
-        { id: "GOA", title: "Goa" }
-      ]
-    }
-  }
-};
+// Cities and trips
+const CITIES = [
+  { id: "HYD", title: "Hyderabad" },
+  { id: "MUM", title: "Mumbai" },
+  { id: "GOA", title: "Goa" }
+];
+
+const TRIPS = [
+  { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
+  { id: "HYD_TO_GOA", title: "HYD TO GOA" }
+];
 
 // Helper to format dates
 const formatDate = (date) => date.toISOString().split("T")[0];
 
-// Build Flight Booking screen response
+// Build Flight Booking screen
 const buildFlightBookingScreen = (startDate, endDate) => {
   const today = new Date();
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
-  // enddate_min must be string
-  const enddate_min = startDate ? startDate : formatDate(new Date(today.getTime() + 86400000)); // tomorrow if no startDate
+  const start = startDate || formatDate(today);
+  const end = endDate || start; // default end = start
 
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+      trip_types: TRIPS,
+      cities: CITIES,
       calendar: {
         min_date: formatDate(today),
         max_date: formatDate(maxDate),
-        init_value: {
-          start_date: startDate || formatDate(today),
-          end_date: endDate || formatDate(maxDate)
-        }
+        init_value: { start_date: start, end_date: end }
       },
-      enddate_min
+      enddate_min: start // dynamic min-date for Enddate
+    }
+  };
+};
+
+// Build Summary screen
+const buildSummaryScreen = (formData) => {
+  // Find city titles
+  const fromCity = CITIES.find(c => c.id === formData.from_city)?.title || formData.from_city;
+  const toCity = CITIES.find(c => c.id === formData.to_city)?.title || formData.to_city;
+
+  return {
+    screen: "SUMMARY_SCREEN",
+    data: {
+      from_city: fromCity,
+      to_city: toCity,
+      Startdate: formData.Startdate,
+      Enddate: formData.Enddate
     }
   };
 };
@@ -62,7 +71,6 @@ const buildFlightBookingScreen = (startDate, endDate) => {
 // Flow Webhook
 const flowWebhook = async (req, res) => {
   if (!PRIVATE_KEY) throw new Error("Private key is empty");
-
   if (!isRequestSignatureValid(req)) return res.status(432).send();
 
   let decryptedRequest;
@@ -87,36 +95,31 @@ const flowWebhook = async (req, res) => {
 const getNextScreen = async (decryptedBody) => {
   const { action, screen, data } = decryptedBody;
 
-  // Ping check
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
-  // Initial load
-  if (action === "INIT") {
-    return buildFlightBookingScreen(null, null);
-  }
+  if (action === "INIT") return buildFlightBookingScreen(null, null);
 
-  // Handle form submissions
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN": {
         const startDate = data.Startdate || null;
         const endDate = data.Enddate || null;
 
-        // Reload screen if Startdate not selected
+        // If Startdate not selected, reload screen
         if (!startDate) return buildFlightBookingScreen(null, null);
 
-        // Startdate selected → Enddate min = Startdate
+        // Return Flight Booking screen with dynamic Enddate min
         return buildFlightBookingScreen(startDate, endDate);
       }
 
       case "SUMMARY_SCREEN": {
         try {
           const bookingData = {
-            from_city: data.from_city || { id: "HYD", title: "Hyderabad" },
-            to_city: data.to_city || { id: "MUM", title: "Mumbai" },
-            start_date: data.Startdate || "Not selected",
-            end_date: data.Enddate || "Not selected",
-            phone_number: "6301015711"
+            from_city: data.from_city,
+            to_city: data.to_city,
+            start_date: data.Startdate,
+            end_date: data.Enddate,
+            phone_number: data.phone_number || "6301015711"
           };
           const saved = await Booking.create(bookingData);
           console.log("✅ Booking saved:", saved);
@@ -140,7 +143,6 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
-  // Default fallback
   return buildFlightBookingScreen(null, null);
 };
 
