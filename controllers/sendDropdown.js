@@ -54,19 +54,13 @@ const getNextScreen = async (decryptedBody) => {
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
-  // Initial load
-  if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-    let enddateMin;
-
-    // If Startdate selected, allow Enddate from Startdate onward
-    if (data?.Startdate) {
-      enddateMin = data.Startdate;
-    } else {
-      // Block Enddate until Startdate selected
+  // Helper to build FLIGHT_BOOKING_SCREEN response
+  const buildFlightBookingScreen = (startDate, endDate) => {
+    const enddate_min = startDate || (() => {
       const blockDate = new Date();
       blockDate.setDate(maxDate.getDate() + 1);
-      enddateMin = blockDate.toISOString().split("T")[0];
-    }
+      return blockDate.toISOString().split("T")[0];
+    })();
 
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
@@ -77,75 +71,61 @@ const getNextScreen = async (decryptedBody) => {
           min_date: formatDate(today),
           max_date: formatDate(maxDate),
           init_value: {
-            start_date: data?.Startdate || formatDate(today),
-            end_date: data?.Enddate || formatDate(maxDate)
+            start_date: startDate || formatDate(today),
+            end_date: endDate || formatDate(maxDate)
           }
         },
         enddate_min
       }
     };
-  }
+  };
 
-  // Handle form submission
+  // Ping check
+  if (action === "ping") return buildFlightBookingScreen();
+
+  // Initial load
+  if (action === "INIT") return buildFlightBookingScreen();
+
+  // Handle form submissions
   if (action === "data_exchange") {
-    if (screen === "FLIGHT_BOOKING_SCREEN") {
-      // If Enddate is selected without Startdate → reload screen blocking Enddate
-      if (!data.Startdate) {
-        const blockDate = new Date();
-        blockDate.setDate(maxDate.getDate() + 1);
+    switch (screen) {
+      case "FLIGHT_BOOKING_SCREEN":
+        // If Startdate not selected → reload screen blocking Enddate
+        if (!data.Startdate) return buildFlightBookingScreen();
+
+        // Startdate selected → go to SUMMARY_SCREEN
         return {
-          screen: "FLIGHT_BOOKING_SCREEN",
+          screen: "SUMMARY_SCREEN",
           data: {
-            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-            calendar: {
-              min_date: formatDate(today),
-              max_date: formatDate(maxDate),
-              init_value: {
-                start_date: formatDate(today),
-                end_date: formatDate(maxDate)
-              }
-            },
-            enddate_min: blockDate.toISOString().split("T")[0]
+            from_city: data.from_city || { id: "HYD", title: "Hyderabad" },
+            to_city: data.to_city || { id: "MUM", title: "Mumbai" },
+            Startdate: { date: data.Startdate },
+            Enddate: { date: data.Enddate || data.Startdate }
           }
         };
-      }
 
-      // Both Startdate selected → allow Enddate
-      return {
-        screen: "SUMMARY_SCREEN",
-        data: {
-          from_city: data.from_city || "Not selected",
-          to_city: data.to_city || "Not selected",
-          Startdate: data.Startdate,
-          Enddate: data.Enddate || data.Startdate
+      case "SUMMARY_SCREEN":
+        try {
+          await Booking.create({
+            from_city: data.from_city?.id || "HYD",
+            to_city: data.to_city?.id || "MUM",
+            start_date: data.Startdate?.date || formatDate(today),
+            end_date: data.Enddate?.date || formatDate(today),
+            phone_number: "6301015711"
+          });
+        } catch (err) {
+          console.error("❌ Booking save error:", err);
         }
-      };
-    }
 
-    // Summary screen → save booking
-    if (screen === "SUMMARY_SCREEN") {
-      try {
-        await Booking.create({
-          from_city: data.from_city,
-          to_city: data.to_city,
-          start_date: data.Startdate,
-          end_date: data.Enddate,
-          phone_number: "6301015711"
-        });
-      } catch (err) {
-        console.error("❌ Booking save error:", err);
-      }
-
-      return {
-        screen: "TERMINAL_SCREEN",
-        data: { message: "Booking flow complete" }
-      };
+        return {
+          screen: "TERMINAL_SCREEN",
+          data: { message: "Booking flow complete" }
+        };
     }
   }
 
-  // Fallback
-  return { screen: "FLIGHT_BOOKING_SCREEN", data: {} };
+  // Default fallback → always return full structure
+  return buildFlightBookingScreen();
 };
 
 module.exports = { flowWebhook, getNextScreen };
