@@ -86,6 +86,24 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
+        // If Startdate not selected, send FLIGHT_BOOKING_SCREEN back with blocked Enddate
+        if (!data.Startdate) {
+          return {
+            screen: "FLIGHT_BOOKING_SCREEN",
+            data: {
+              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
+              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
+              calendar: {
+                min_date: formatDate(today),
+                max_date: formatDate(maxDate),
+                init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+              },
+              enddate_min: new Date(maxDate.getTime() + 86400000).toISOString().split("T")[0] // block Enddate
+            }
+          };
+        }
+
+        // Startdate selected -> go to summary
         return {
           screen: "SUMMARY_SCREEN",
           data: {
@@ -105,8 +123,7 @@ const getNextScreen = async (decryptedBody) => {
             end_date: data.Enddate || "Not selected",
             phone_number: "6301015711"
           };
-          const saved = await Booking.create(bookingData);
-          console.log("✅ Booking saved:", saved);
+          await Booking.create(bookingData);
         } catch (err) {
           console.error("❌ Error saving booking:", err);
         }
@@ -129,18 +146,8 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
-  // Dynamically set Enddate min-date
-  const enddate_min = data?.Startdate || formatDate(today);
-
-
-if (data?.Startdate) {
-  enddate_min = data.Startdate;
-} else {
-  // Startdate not selected, block Enddate by setting min-date beyond max-date
-  const blockDate = new Date();
-  blockDate.setDate(maxDate.getDate() + 1);
-  enddate_min = blockDate.toISOString().split("T")[0];
-}
+  // Default FLIGHT_BOOKING_SCREEN reload
+  let enddate_min = data?.Startdate ? data.Startdate : new Date(maxDate.getTime() + 86400000).toISOString().split("T")[0];
 
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
@@ -156,5 +163,6 @@ if (data?.Startdate) {
     }
   };
 };
+
 
 module.exports = { flowWebhook, getNextScreen };
