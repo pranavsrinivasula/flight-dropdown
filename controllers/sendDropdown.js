@@ -80,7 +80,7 @@ const getNextScreen = async (decryptedBody) => {
           max_date: formatDate(maxDate),
           init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
         },
-        enddate_min: blockDate.toISOString().split("T")[0]
+        enddate_min: blockDate.toISOString().split("T")[0] // Enddate blocked initially
       }
     };
   }
@@ -90,25 +90,14 @@ const getNextScreen = async (decryptedBody) => {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
         // If Startdate not selected → reload screen with blocked Enddate
-        if (!data.Startdate) {
-          const blockDate = new Date();
-          blockDate.setDate(maxDate.getDate() + 1);
-          return {
-            screen: "FLIGHT_BOOKING_SCREEN",
-            data: {
-              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.trip_types,
-              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.data.cities,
-              calendar: {
-                min_date: formatDate(today),
-                max_date: formatDate(maxDate),
-                init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
-              },
-              enddate_min: blockDate.toISOString().split("T")[0]
-            }
-          };
-        }
+        const enddateMin = data?.Startdate
+          ? data.Startdate // Startdate selected → Enddate min = Startdate
+          : (() => {
+              const blockDate = new Date();
+              blockDate.setDate(maxDate.getDate() + 1); // block Enddate
+              return blockDate.toISOString().split("T")[0];
+            })();
 
-        // Startdate selected → Enddate min = Startdate
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
           data: {
@@ -117,9 +106,12 @@ const getNextScreen = async (decryptedBody) => {
             calendar: {
               min_date: formatDate(today),
               max_date: formatDate(maxDate),
-              init_value: { start_date: data.Startdate, end_date: data.Enddate || formatDate(maxDate) }
+              init_value: {
+                start_date: data?.Startdate || formatDate(today),
+                end_date: data?.Enddate || formatDate(maxDate)
+              }
             },
-            enddate_min: data.Startdate
+            enddate_min
           }
         };
 
@@ -153,7 +145,7 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
-  // Default fallback
+  // Default fallback: block Enddate
   const blockDate = new Date();
   blockDate.setDate(maxDate.getDate() + 1);
   return {
