@@ -81,12 +81,13 @@ const getNextScreen = async ({ action, screen, data }) => {
               trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-              is_age_enabled: !!data?.name,
+              is_age_enabled: false,
               error: "Please enter Name first before filling Age"
             }
           };
         }
 
+        // Normal flow when Name is present
         return {
           screen: "SUMMARY_SCREEN",
           data: {
@@ -141,6 +142,7 @@ const getNextScreen = async ({ action, screen, data }) => {
     }
   }
 
+  // Default fallback
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
