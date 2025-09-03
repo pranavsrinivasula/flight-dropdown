@@ -55,26 +55,11 @@ const getNextScreen = async (decryptedBody) => {
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
+  // Health check
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
-  // INIT or FLIGHT_BOOKING_SCREEN
+  // INIT / First screen
   if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-    // If name is not entered yet, show error and keep age visible
-    if (!data?.name) {
-      return {
-        screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-      enddate_visible: { value: !!data?.Startdate },
-      error: "Please enter Name first",
-      is_age_enabled: false
-        }
-      };
-    }
-
-    // Normal flow when name is present
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
@@ -82,13 +67,15 @@ const getNextScreen = async (decryptedBody) => {
         cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
         enddate_visible: { value: !!data?.Startdate },
-        is_age_enabled: true
+        error: !data?.name ? "Please enter Name first" : undefined,
+        is_age_enabled: !!data?.name // age enabled only if name entered
       }
     };
   }
 
   if (action === "data_exchange") {
     switch (screen) {
+      // When user submits flight booking screen
       case "FLIGHT_BOOKING_SCREEN":
         return {
           screen: "SUMMARY_SCREEN",
@@ -99,10 +86,12 @@ const getNextScreen = async (decryptedBody) => {
             Enddate: { value: data.Enddate || null },
             name: data.name || "",
             age: data.age || "",
-            is_age_enabled: true
+            // Only allow editing age if name is filled
+            is_age_enabled: !!data?.name
           }
         };
 
+      // When user submits summary screen
       case "SUMMARY_SCREEN":
         try {
           if (!data.Startdate) throw new Error("Startdate is required");
@@ -112,6 +101,7 @@ const getNextScreen = async (decryptedBody) => {
           if (!data.name) throw new Error("Name is required");
           if (!data.age) throw new Error("Age is required");
 
+          // Save booking
           await Booking.create({
             from_city: data.from_city,
             to_city: data.to_city,
@@ -130,7 +120,7 @@ const getNextScreen = async (decryptedBody) => {
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
-              is_age_enabled: true,
+              is_age_enabled: !!data?.name,
               error: err.message
             }
           };
@@ -153,6 +143,7 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
+  // Default fallback
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
@@ -160,7 +151,7 @@ const getNextScreen = async (decryptedBody) => {
       cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: false },
-      is_age_enabled: true
+      is_age_enabled: false
     }
   };
 };
