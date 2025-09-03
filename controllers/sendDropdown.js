@@ -69,7 +69,7 @@ const getNextScreen = async (decryptedBody) => {
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: !!data?.Startdate },
       error: "Please enter Name first",
-      is_age_enabled: true // must be true
+      is_age_enabled: false
         }
       };
     }
