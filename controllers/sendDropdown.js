@@ -1,4 +1,3 @@
-// flowController.js
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 const { isRequestSignatureValid } = require("../middleware/valid");
 const mongoose = require("mongoose");
@@ -49,8 +48,7 @@ const flowWebhook = async (req, res) => {
 };
 
 // Main logic
-const getNextScreen = async (decryptedBody) => {
-  const { action, screen, data } = decryptedBody;
+const getNextScreen = async ({ action, screen, data }) => {
   const today = new Date();
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
@@ -66,18 +64,16 @@ const getNextScreen = async (decryptedBody) => {
         trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
         cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-        enddate_visible: { value: !!data?.Startdate },
-        error: !data?.name ? "Please enter Name first" : undefined,
-        is_age_enabled: !!data?.name // age enabled only if name entered
+        is_age_enabled: !!data?.name,
+        error: !data?.name ? "Please enter Name first" : undefined
       }
     };
   }
 
   if (action === "data_exchange") {
     switch (screen) {
-      // Check before processing FLIGHT_BOOKING_SCREEN submission
       case "FLIGHT_BOOKING_SCREEN":
-        // Prevent entering Age before Name
+        // If Age filled without Name, block and show error
         if (!data.name && data.age) {
           return {
             screen: "FLIGHT_BOOKING_SCREEN",
@@ -85,21 +81,19 @@ const getNextScreen = async (decryptedBody) => {
               trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-              enddate_visible: { value: !!data.Startdate },
               is_age_enabled: !!data?.name,
               error: "Please enter Name first before filling Age"
             }
           };
         }
 
-        // Normal flow when Name is present
         return {
           screen: "SUMMARY_SCREEN",
           data: {
-            from_city: data.from_city || { id: "NA", title: "Not selected" },
-            to_city: data.to_city || { id: "NA", title: "Not selected" },
-            Startdate: { value: data.Startdate || null },
-            Enddate: { value: data.Enddate || null },
+            from_city: data.from_city || "",
+            to_city: data.to_city || "",
+            Startdate: data.Startdate || "",
+            Enddate: data.Enddate || "",
             name: data.name || "",
             age: data.age || "",
             is_age_enabled: !!data?.name
@@ -131,7 +125,6 @@ const getNextScreen = async (decryptedBody) => {
               trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-              enddate_visible: { value: !!data.Startdate },
               is_age_enabled: !!data?.name,
               error: err.message
             }
@@ -142,31 +135,21 @@ const getNextScreen = async (decryptedBody) => {
           screen: "TERMINAL_SCREEN",
           data: {
             message: "Booking flow complete",
-            trip_summary: {
-              from_city: data.from_city,
-              to_city: data.to_city,
-              Startdate: data.Startdate,
-              Enddate: data.Enddate,
-              name: data.name,
-              age: data.age
-            }
+            trip_summary: { ...data }
           }
         };
     }
   }
 
-  // Default fallback
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
       trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
       cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-      enddate_visible: { value: false },
       is_age_enabled: false
     }
   };
 };
-
 
 module.exports = { flowWebhook, getNextScreen };
