@@ -63,13 +63,13 @@ const getNextScreen = async (decryptedBody) => {
     if (!data?.name) {
       return {
         screen: "FLIGHT_BOOKING_SCREEN",
-        data: {
-          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-          cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-          calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-          enddate_visible: { value: !!data?.Startdate },
-          error: "Please enter Name first",
-          is_age_enabled: false 
+    data: {
+      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+      enddate_visible: { value: !!data?.Startdate },
+      error: "Please enter Name first",
+      is_age_enabled: true // must be true
         }
       };
     }
