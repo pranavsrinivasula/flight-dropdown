@@ -57,20 +57,19 @@ const getNextScreen = async (decryptedBody) => {
 
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
-if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-  return {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-      enddate_visible: { value: !!data?.Startdate },
-      // 👇 Enable Age only if Name is filled
-      is_age_enabled: !!data?.name
-    }
-  };
-}
-
+  if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
+    return {
+      screen: "FLIGHT_BOOKING_SCREEN",
+      data: {
+        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+        calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+        enddate_visible: { value: !!data?.Startdate },
+        // 👇 Age field enabled only if Name exists
+        is_age_enabled: !!data?.name
+      }
+    };
+  }
 
   if (action === "data_exchange") {
     switch (screen) {
@@ -82,7 +81,10 @@ if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
             to_city: data.to_city || { id: "NA", title: "Not selected" },
             Startdate: { value: data.Startdate || null },
             Enddate: { value: data.Enddate || null },
-            is_age_enabled: !!data?.name   // 👈 Keep logic consistent on exchange
+            name: data.name || "",
+            age: data.age || "",
+            // carry forward dynamic enabling
+            is_age_enabled: !!data?.name
           }
         };
 
@@ -94,13 +96,14 @@ if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
           }
           if (!data.name) throw new Error("Name is required");
           if (!data.age) throw new Error("Age is required");
-          if (!data.name && data.age) throw new Error("Age cannot be filled before Name");
 
           await Booking.create({
             from_city: data.from_city,
             to_city: data.to_city,
             start_date: data.Startdate,
             end_date: data.Enddate || data.Startdate,
+            name: data.name,
+            age: data.age,
             phone_number: "6301015711"
           });
         } catch (err) {
@@ -142,7 +145,7 @@ if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
       cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: false },
-      is_age_enabled: false  // 
+      is_age_enabled: false
     }
   };
 };
