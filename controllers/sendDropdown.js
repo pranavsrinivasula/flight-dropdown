@@ -75,8 +75,24 @@ const getNextScreen = async (decryptedBody) => {
 
   if (action === "data_exchange") {
     switch (screen) {
-      // When user submits flight booking screen
+      // Check before processing FLIGHT_BOOKING_SCREEN submission
       case "FLIGHT_BOOKING_SCREEN":
+        // Prevent entering Age before Name
+        if (!data.name && data.age) {
+          return {
+            screen: "FLIGHT_BOOKING_SCREEN",
+            data: {
+              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+              calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+              enddate_visible: { value: !!data.Startdate },
+              is_age_enabled: !!data?.name,
+              error: "Please enter Name first before filling Age"
+            }
+          };
+        }
+
+        // Normal flow when Name is present
         return {
           screen: "SUMMARY_SCREEN",
           data: {
@@ -86,20 +102,16 @@ const getNextScreen = async (decryptedBody) => {
             Enddate: { value: data.Enddate || null },
             name: data.name || "",
             age: data.age || "",
-            // Only allow editing age if name is filled
             is_age_enabled: !!data?.name
           }
         };
 
-      // When user submits summary screen
       case "SUMMARY_SCREEN":
         try {
           if (!data.Startdate) throw new Error("Startdate is required");
           if (data.Enddate && new Date(data.Enddate) < new Date(data.Startdate)) {
             throw new Error("Enddate cannot be before Startdate");
           }
-          if (!data.name) throw new Error("Name is required");
-          if (!data.age) throw new Error("Age is required");
 
           // Save booking
           await Booking.create({
@@ -155,5 +167,6 @@ const getNextScreen = async (decryptedBody) => {
     }
   };
 };
+
 
 module.exports = { flowWebhook, getNextScreen };
