@@ -69,7 +69,7 @@ const getNextScreen = async (decryptedBody) => {
           calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
           enddate_visible: { value: !!data?.Startdate },
           error: "Please enter Name first",
-          is_age_enabled: true // keep age field visible
+          is_age_enabled: false 
         }
       };
     }
@@ -130,7 +130,7 @@ const getNextScreen = async (decryptedBody) => {
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
-              is_age_enabled: false,
+              is_age_enabled: true,
               error: err.message
             }
           };
