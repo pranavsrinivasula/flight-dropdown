@@ -57,18 +57,20 @@ const getNextScreen = async (decryptedBody) => {
 
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
-  if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-    return {
-      screen: "FLIGHT_BOOKING_SCREEN",
-      data: {
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-        calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-        enddate_visible: { value: !!data?.Startdate },
-        is_age_enabled: !!data?.name   // 👈 Age enabled only if Name exists
-      }
-    };
-  }
+if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
+  return {
+    screen: "FLIGHT_BOOKING_SCREEN",
+    data: {
+      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+      enddate_visible: { value: !!data?.Startdate },
+      // 👇 Enable Age only if Name is filled
+      is_age_enabled: !!data?.name
+    }
+  };
+}
+
 
   if (action === "data_exchange") {
     switch (screen) {
@@ -140,7 +142,7 @@ const getNextScreen = async (decryptedBody) => {
       cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: false },
-      is_age_enabled: false  // 👈 Default: disabled
+      is_age_enabled: false  // 
     }
   };
 };
