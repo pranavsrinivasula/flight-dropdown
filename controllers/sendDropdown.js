@@ -57,7 +57,24 @@ const getNextScreen = async (decryptedBody) => {
 
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
+  // INIT or FLIGHT_BOOKING_SCREEN
   if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
+    // If name is not entered yet, show error and keep age visible
+    if (!data?.name) {
+      return {
+        screen: "FLIGHT_BOOKING_SCREEN",
+        data: {
+          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+          cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+          calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+          enddate_visible: { value: !!data?.Startdate },
+          error: "Please enter Name first",
+          is_age_enabled: true // keep age field visible
+        }
+      };
+    }
+
+    // Normal flow when name is present
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
@@ -65,8 +82,7 @@ const getNextScreen = async (decryptedBody) => {
         cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
         enddate_visible: { value: !!data?.Startdate },
-        // 👇 Age field enabled only if Name exists
-        is_age_enabled: !!data?.name
+        is_age_enabled: true
       }
     };
   }
@@ -83,8 +99,7 @@ const getNextScreen = async (decryptedBody) => {
             Enddate: { value: data.Enddate || null },
             name: data.name || "",
             age: data.age || "",
-            // carry forward dynamic enabling
-            is_age_enabled: !!data?.name
+            is_age_enabled: true
           }
         };
 
@@ -115,7 +130,7 @@ const getNextScreen = async (decryptedBody) => {
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
-              is_age_enabled: !!data?.name,
+              is_age_enabled: true,
               error: err.message
             }
           };
@@ -145,7 +160,7 @@ const getNextScreen = async (decryptedBody) => {
       cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: false },
-      is_age_enabled: false
+      is_age_enabled: true
     }
   };
 };
