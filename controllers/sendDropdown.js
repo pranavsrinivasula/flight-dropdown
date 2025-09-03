@@ -88,6 +88,9 @@ const getNextScreen = async (decryptedBody) => {
           if (data.Enddate && new Date(data.Enddate) < new Date(data.Startdate)) {
             throw new Error("Enddate cannot be before Startdate");
           }
+          if (!data.name) throw new Error("Name is required");
+          if (!data.age) throw new Error("Age is required");
+
 
           await Booking.create({
             from_city: data.from_city,
