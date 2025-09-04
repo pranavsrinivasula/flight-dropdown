@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { flowWebhook } = require("../controllers/sendDropdown");
+const { sendDropdown } = require("../controllers/sendDropdown");
 
 // POST /flow-webhook/
-router.post("/flow-webhook",  flowWebhook);
+router.post("/sendDropdown",  sendDropdown);
 
 module.exports = router;
