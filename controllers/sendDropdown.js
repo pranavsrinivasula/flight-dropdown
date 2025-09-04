@@ -1,93 +1,40 @@
-const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
-const { isRequestSignatureValid } = require("../middleware/valid");
-const mongoose = require("mongoose");
-const Booking = require("../models/Booking");
-require("dotenv").config();
-
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const PASSPHRASE = process.env.PASSPHRASE;
-
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ Mongo error:", err));
-
-const SCREEN_RESPONSES = {
-  FLIGHT_BOOKING_SCREEN: {
-    trip_types: [
-      { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
-      { id: "HYD_TO_GOA", title: "HYD TO GOA" }
-    ],
-    cities: [
-      { id: "HYD", title: "Hyderabad" },
-      { id: "MUM", title: "Mumbai" },
-      { id: "GOA", title: "Goa" }
-    ]
-  }
-};
-
-const formatDate = (date) => date.toISOString().split("T")[0];
-
-// Flow Webhook
-const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) throw new Error("Private key is empty");
-  if (!isRequestSignatureValid(req)) return res.status(432).send();
-
-  let decryptedRequest;
-  try {
-    decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
-  } catch (err) {
-    console.error("Decryption failed:", err);
-    if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
-    return res.status(500).send();
-  }
-
-  const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-  const screenResponse = await getNextScreen(decryptedBody);
-  res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
-};
-
-// Main logic
 const getNextScreen = async ({ action, screen, data }) => {
   const today = new Date();
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
-  // Health check
+  const baseData = {
+    trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+    cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+    calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+    is_age_enabled: false,
+    is_to_city_enabled: false
+  };
+
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
-  // INIT / First screen
   if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-    return {
-      screen: "FLIGHT_BOOKING_SCREEN",
-      data: {
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-        calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-        is_age_enabled: !!data?.name,
-        error: !data?.name ? "Please enter Name first" : undefined
-      }
-    };
+    return { screen: "FLIGHT_BOOKING_SCREEN", data: baseData };
   }
 
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        // If Age filled without Name, block and show error
-        if (!data.name && data.age) {
+        // ✅ Handle Verify Button
+        if (data.verify_name) {
+          if (!data.name) {
+            return {
+              screen: "FLIGHT_BOOKING_SCREEN",
+              data: { ...baseData, error: "Please enter Name before verifying" }
+            };
+          }
           return {
             screen: "FLIGHT_BOOKING_SCREEN",
-            data: {
-              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-              calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-              is_age_enabled: false,
-              error: "Please enter Name first before filling Age"
-            }
+            data: { ...baseData, is_age_enabled: true, is_to_city_enabled: !!data.from_city }
           };
         }
 
-        // Normal flow when Name is present
+        // Continue button → move to summary
         return {
           screen: "SUMMARY_SCREEN",
           data: {
@@ -96,8 +43,7 @@ const getNextScreen = async ({ action, screen, data }) => {
             Startdate: data.Startdate || "",
             Enddate: data.Enddate || "",
             name: data.name || "",
-            age: data.age || "",
-            is_age_enabled: !!data?.name
+            age: data.age || ""
           }
         };
 
@@ -108,7 +54,6 @@ const getNextScreen = async ({ action, screen, data }) => {
             throw new Error("Enddate cannot be before Startdate");
           }
 
-          // Save booking
           await Booking.create({
             from_city: data.from_city,
             to_city: data.to_city,
@@ -122,13 +67,7 @@ const getNextScreen = async ({ action, screen, data }) => {
           console.error(err.message);
           return {
             screen: "FLIGHT_BOOKING_SCREEN",
-            data: {
-              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-              calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-              is_age_enabled: !!data?.name,
-              error: err.message
-            }
+            data: { ...baseData, error: err.message }
           };
         }
 
@@ -142,16 +81,5 @@ const getNextScreen = async ({ action, screen, data }) => {
     }
   }
 
-  // Default fallback
-  return {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-      is_age_enabled: false
-    }
-  };
+  return { screen: "FLIGHT_BOOKING_SCREEN", data: baseData };
 };
-
-module.exports = { flowWebhook, getNextScreen };
