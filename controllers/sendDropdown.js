@@ -65,7 +65,9 @@ const getNextScreen = async (decryptedBody) => {
         cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
         enddate_visible: { value: !!data?.Startdate },
-        is_to_city_enabled: true
+        is_age_enabled: false,
+        is_to_city_enabled: true,
+        to_city_options: [] // empty until from_city selected
       }
     };
   }
@@ -73,13 +75,21 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
+        // populate to_city options only if from_city is selected
+        const toCityOptions = data.from_city
+          ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
+          : [];
+
         return {
-          screen: "SUMMARY_SCREEN",
+          screen: "FLIGHT_BOOKING_SCREEN",
           data: {
-            from_city: data.from_city || { id: "NA", title: "Not selected" },
-            to_city: data.to_city || { id: "NA", title: "Not selected" },
-            Startdate: { value: data.Startdate || null },
-            Enddate: { value: data.Enddate || null }
+            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+            calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+            enddate_visible: { value: !!data.Startdate },
+            is_age_enabled: !!data.from_city,
+            is_to_city_enabled: true,
+            to_city_options: toCityOptions
           }
         };
 
@@ -106,8 +116,9 @@ const getNextScreen = async (decryptedBody) => {
               cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
-               is_age_enabled: false,
-  is_to_city_enabled: true,
+              is_age_enabled: false,
+              is_to_city_enabled: true,
+              to_city_options: [],
               error: err.message
             }
           };
@@ -134,7 +145,10 @@ const getNextScreen = async (decryptedBody) => {
       trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
       cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-      enddate_visible: { value: false }
+      enddate_visible: { value: false },
+      is_age_enabled: false,
+      is_to_city_enabled: true,
+      to_city_options: []
     }
   };
 };
