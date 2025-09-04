@@ -66,8 +66,10 @@ const getNextScreen = async (decryptedBody) => {
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
         enddate_visible: { value: !!data?.Startdate },
         is_age_enabled: false,
-        is_to_city_enabled: true,
-        to_city_options: [] // empty until from_city selected
+        is_to_city_enabled: !!data?.from_city, // ENABLE To City only if From City is selected
+        to_city_options: data?.from_city
+          ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
+          : []
       }
     };
   }
@@ -75,7 +77,6 @@ const getNextScreen = async (decryptedBody) => {
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        // populate to_city options only if from_city is selected
         const toCityOptions = data.from_city
           ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
           : [];
@@ -88,7 +89,7 @@ const getNextScreen = async (decryptedBody) => {
             calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
             enddate_visible: { value: !!data.Startdate },
             is_age_enabled: !!data.from_city,
-            is_to_city_enabled: true,
+            is_to_city_enabled: !!data.from_city, // Enable only if from_city is selected
             to_city_options: toCityOptions
           }
         };
@@ -117,8 +118,10 @@ const getNextScreen = async (decryptedBody) => {
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
               is_age_enabled: false,
-              is_to_city_enabled: true,
-              to_city_options: [],
+              is_to_city_enabled: !!data.from_city,
+              to_city_options: data.from_city
+                ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
+                : [],
               error: err.message
             }
           };
@@ -147,7 +150,7 @@ const getNextScreen = async (decryptedBody) => {
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: false },
       is_age_enabled: false,
-      is_to_city_enabled: true,
+      is_to_city_enabled: false, // DISABLED by default
       to_city_options: []
     }
   };
