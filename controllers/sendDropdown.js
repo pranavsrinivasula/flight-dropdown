@@ -21,7 +21,6 @@ const getNextScreen = async ({ action, screen, data }) => {
   if (action === "data_exchange") {
     switch (screen) {
       case "FLIGHT_BOOKING_SCREEN":
-        // ✅ Handle Verify Button
         if (data.verify_name) {
           if (!data.name) {
             return {
@@ -110,3 +109,5 @@ const getNextScreen = async ({ action, screen, data }) => {
     }
   };
 };
+
+module.exports= {getNextScreen}
