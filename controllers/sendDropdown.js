@@ -65,7 +65,7 @@ const getNextScreen = async (decryptedBody) => {
         cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
         enddate_visible: { value: !!data?.Startdate },
-        is_to_city_enabled: false
+        is_to_city_enabled: true
       }
     };
   }
@@ -107,7 +107,7 @@ const getNextScreen = async (decryptedBody) => {
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
                is_age_enabled: false,
-  is_to_city_enabled: false,
+  is_to_city_enabled: true,
               error: err.message
             }
           };
