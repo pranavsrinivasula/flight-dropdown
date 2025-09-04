@@ -57,7 +57,9 @@ const getNextScreen = async (decryptedBody) => {
 
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
+  // Initial screen
   if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
+    const fromCitySelected = data?.from_city;
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
@@ -65,11 +67,11 @@ const getNextScreen = async (decryptedBody) => {
         cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
         calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
         enddate_visible: { value: !!data?.Startdate },
-        is_age_enabled: false,
-        is_to_city_enabled: !!data?.from_city, // ENABLE To City only if From City is selected
-        to_city_options: data?.from_city
-          ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
-          : []
+        is_age_enabled: !!fromCitySelected,
+        // Always enabled, but options depend on from_city selection
+        to_city_options: fromCitySelected
+          ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCitySelected.id)
+          : [{ id: "", title: "Select From City first" }]
       }
     };
   }
@@ -79,7 +81,7 @@ const getNextScreen = async (decryptedBody) => {
       case "FLIGHT_BOOKING_SCREEN":
         const toCityOptions = data.from_city
           ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
-          : [];
+          : [{ id: "", title: "Select From City first" }];
 
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
@@ -89,7 +91,6 @@ const getNextScreen = async (decryptedBody) => {
             calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
             enddate_visible: { value: !!data.Startdate },
             is_age_enabled: !!data.from_city,
-            is_to_city_enabled: !!data.from_city, // Enable only if from_city is selected
             to_city_options: toCityOptions
           }
         };
@@ -118,10 +119,9 @@ const getNextScreen = async (decryptedBody) => {
               calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
               enddate_visible: { value: !!data.Startdate },
               is_age_enabled: false,
-              is_to_city_enabled: !!data.from_city,
               to_city_options: data.from_city
                 ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
-                : [],
+                : [{ id: "", title: "Select From City first" }],
               error: err.message
             }
           };
@@ -142,6 +142,7 @@ const getNextScreen = async (decryptedBody) => {
     }
   }
 
+  // Default fallback
   return {
     screen: "FLIGHT_BOOKING_SCREEN",
     data: {
@@ -150,8 +151,7 @@ const getNextScreen = async (decryptedBody) => {
       calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
       enddate_visible: { value: false },
       is_age_enabled: false,
-      is_to_city_enabled: false, // DISABLED by default
-      to_city_options: []
+      to_city_options: [{ id: "", title: "Select From City first" }]
     }
   };
 };
