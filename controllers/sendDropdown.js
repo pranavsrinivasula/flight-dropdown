@@ -3,18 +3,19 @@ const getNextScreen = async ({ action, screen, data }) => {
   const maxDate = new Date();
   maxDate.setDate(today.getDate() + 365);
 
-  const baseData = {
-    trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-    cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-    calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-    is_age_enabled: false,
-    is_to_city_enabled: false
-  };
-
   if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
 
   if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-    return { screen: "FLIGHT_BOOKING_SCREEN", data: baseData };
+    return {
+      screen: "FLIGHT_BOOKING_SCREEN",
+      data: {
+        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+        calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+        is_age_enabled: false,
+        is_to_city_enabled: false 
+      }
+    };
   }
 
   if (action === "data_exchange") {
@@ -25,12 +26,24 @@ const getNextScreen = async ({ action, screen, data }) => {
           if (!data.name) {
             return {
               screen: "FLIGHT_BOOKING_SCREEN",
-              data: { ...baseData, error: "Please enter Name before verifying" }
+              data: {
+                trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+                cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+                calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+                is_age_enabled: false,
+                is_to_city_enabled: !!data.from_city,
+                error: "Please enter Name before verifying"
+              }
             };
           }
           return {
             screen: "FLIGHT_BOOKING_SCREEN",
-            data: { ...baseData, is_age_enabled: true, is_to_city_enabled: !!data.from_city }
+            data: {
+              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+              calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+              is_age_enabled: true
+            }
           };
         }
 
@@ -67,7 +80,13 @@ const getNextScreen = async ({ action, screen, data }) => {
           console.error(err.message);
           return {
             screen: "FLIGHT_BOOKING_SCREEN",
-            data: { ...baseData, error: err.message }
+            data: {
+              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+              calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+              is_age_enabled: false,
+              error: err.message
+            }
           };
         }
 
@@ -81,5 +100,13 @@ const getNextScreen = async ({ action, screen, data }) => {
     }
   }
 
-  return { screen: "FLIGHT_BOOKING_SCREEN", data: baseData };
+  return {
+    screen: "FLIGHT_BOOKING_SCREEN",
+    data: {
+      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
+      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+      is_age_enabled: false
+    }
+  };
 };
