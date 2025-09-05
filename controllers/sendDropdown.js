@@ -70,8 +70,8 @@ const getNextScreen = async (decryptedBody) => {
         is_age_enabled: !!fromCitySelected,
         // Always enabled, but options depend on from_city selection
         to_city_options: fromCitySelected
-          ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCitySelected.id)
-          : [{ id: "", title: "Select From City first" }]
+          // ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCitySelected.id)
+          // : [{ id: "", title: "Select From City first" }]
       }
     };
   }
