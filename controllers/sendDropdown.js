@@ -44,62 +44,53 @@ const flowWebhook = async (req, res) => {
   }
 
   const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-  const screenResponse = await getNextScreen(decryptedBody);
+
+  const { screen, data } = decryptedBody;
+
+  const screenResponse = await getNextScreen(screen, data, decryptedBody.userId);
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
 // Main logic
-const getNextScreen = async (currentScreenId, inputData, userId) => {
+const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   try {
+    const today = new Date();
+    const maxDate = new Date();
+    maxDate.setDate(today.getDate() + 365);
+
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
       const { from_city, to_city, start_date, end_date } = inputData;
 
-      // Filter options dynamically for "to_city"
+      // Dynamic "to_city" options
       const toCityOptions = from_city
-        ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(
-            (c) => c.id !== from_city.id
-          )
+        ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== from_city.id)
         : [{ id: "", title: "Select From City first" }];
 
-      // Validation: prevent same city in from/to
+      // Validation
       if (from_city && to_city && from_city === to_city) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            error: "From and To city cannot be the same",
-            to_city_options: toCityOptions,
-          },
+          data: { error: "From and To city cannot be the same", to_city_options: toCityOptions }
         };
       }
 
-      // Validation: end_date should not be before start_date
       if (start_date && end_date && new Date(end_date) < new Date(start_date)) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            error: "End date cannot be before start date",
-            to_city_options: toCityOptions,
-          },
+          data: { error: "End date cannot be before start date", to_city_options: toCityOptions }
         };
       }
 
-      // Proceed only if all fields are filled
+      // Proceed if all required fields filled
       if (from_city && to_city && start_date && end_date) {
-        await Booking.create({
-          userId,
-          from_city,
-          to_city,
-          start_date,
-          end_date,
-        });
-
+        await Booking.create({ userId, from_city, to_city, start_date, end_date });
         return {
           screen: "SUMMARY_SCREEN",
-          data: { from_city, to_city, start_date, end_date },
+          data: { from_city, to_city, start_date, end_date }
         };
       }
 
-      // Return same screen with updated options + UI flags
+      // Return same screen with updated options & flags
       return {
         screen: "FLIGHT_BOOKING_SCREEN",
         data: {
@@ -109,24 +100,29 @@ const getNextScreen = async (currentScreenId, inputData, userId) => {
           end_date,
           to_city_options: toCityOptions,
           is_age_enabled: !!from_city,
+          is_to_city_enabled: !!from_city,
           enddate_visible: { value: !!start_date },
-        },
+          calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+          cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities
+        }
       };
     }
 
     if (currentScreenId === "SUMMARY_SCREEN") {
       return {
         screen: "TERMINAL_SCREEN",
-        data: { message: "Booking completed successfully!" },
+        data: { status: "Booking confirmed" }
       };
     }
 
-    return { screen: "TERMINAL_SCREEN", data: {} };
+    // Default fallback
+    return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
+
   } catch (error) {
     console.error("Error in getNextScreen:", error);
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
-
 
 module.exports = { flowWebhook, getNextScreen };
