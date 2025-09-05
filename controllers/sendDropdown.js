@@ -49,111 +49,85 @@ const flowWebhook = async (req, res) => {
 };
 
 // Main logic
-const getNextScreen = async (decryptedBody) => {
-  const { action, screen, data } = decryptedBody;
-  const today = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(today.getDate() + 365);
+const getNextScreen = async (currentScreenId, inputData, userId) => {
+  try {
+    if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
+      const { from_city, to_city, start_date, end_date } = inputData;
 
-  if (action === "ping") return { screen: "FLIGHT_BOOKING_SCREEN", data: { status: "active" } };
+      // Filter options dynamically for "to_city"
+      const toCityOptions = from_city
+        ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(
+            (c) => c.id !== from_city.id
+          )
+        : [{ id: "", title: "Select From City first" }];
 
-  // Initial screen
-  if (action === "INIT" || screen === "FLIGHT_BOOKING_SCREEN") {
-    const fromCitySelected = data?.from_city;
-    return {
-      screen: "FLIGHT_BOOKING_SCREEN",
-      data: {
-        trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-        cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-        calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-        enddate_visible: { value: !!data?.Startdate },
-        is_age_enabled: !!fromCitySelected,
-        // Always enabled, but options depend on from_city selection
-        to_city_options: fromCitySelected
-          // ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCitySelected.id)
-          // : [{ id: "", title: "Select From City first" }]
-      }
-    };
-  }
-
-  if (action === "data_exchange") {
-    switch (screen) {
-      case "FLIGHT_BOOKING_SCREEN":
-        const toCityOptions = data.from_city
-          ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
-          : [{ id: "", title: "Select From City first" }];
-
+      // Validation: prevent same city in from/to
+      if (from_city && to_city && from_city === to_city) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
           data: {
-            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-            calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-            enddate_visible: { value: !!data.Startdate },
-            is_age_enabled: !!data.from_city,
-            to_city_options: toCityOptions
-          }
+            error: "From and To city cannot be the same",
+            to_city_options: toCityOptions,
+          },
         };
+      }
 
-      case "SUMMARY_SCREEN":
-        try {
-          if (!data.Startdate) throw new Error("Startdate is required");
-          if (data.Enddate && new Date(data.Enddate) < new Date(data.Startdate)) {
-            throw new Error("Enddate cannot be before Startdate");
-          }
+      // Validation: end_date should not be before start_date
+      if (start_date && end_date && new Date(end_date) < new Date(start_date)) {
+        return {
+          screen: "FLIGHT_BOOKING_SCREEN",
+          data: {
+            error: "End date cannot be before start date",
+            to_city_options: toCityOptions,
+          },
+        };
+      }
 
-          await Booking.create({
-            from_city: data.from_city,
-            to_city: data.to_city,
-            start_date: data.Startdate,
-            end_date: data.Enddate || data.Startdate,
-            phone_number: "6301015711"
-          });
-        } catch (err) {
-          console.error(err.message);
-          return {
-            screen: "FLIGHT_BOOKING_SCREEN",
-            data: {
-              trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-              cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-              calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-              enddate_visible: { value: !!data.Startdate },
-              is_age_enabled: false,
-              to_city_options: data.from_city
-                ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== data.from_city.id)
-                : [{ id: "", title: "Select From City first" }],
-              error: err.message
-            }
-          };
-        }
+      // Proceed only if all fields are filled
+      if (from_city && to_city && start_date && end_date) {
+        await Booking.create({
+          userId,
+          from_city,
+          to_city,
+          start_date,
+          end_date,
+        });
 
         return {
-          screen: "TERMINAL_SCREEN",
-          data: {
-            message: "Booking flow complete",
-            trip_summary: {
-              from_city: data.from_city,
-              to_city: data.to_city,
-              Startdate: data.Startdate,
-              Enddate: data.Enddate
-            }
-          }
+          screen: "SUMMARY_SCREEN",
+          data: { from_city, to_city, start_date, end_date },
         };
-    }
-  }
+      }
 
-  // Default fallback
-  return {
-    screen: "FLIGHT_BOOKING_SCREEN",
-    data: {
-      trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-      cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities,
-      calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-      enddate_visible: { value: false },
-      is_age_enabled: false,
-      to_city_options: [{ id: "", title: "Select From City first" }]
+      // Return same screen with updated options + UI flags
+      return {
+        screen: "FLIGHT_BOOKING_SCREEN",
+        data: {
+          from_city,
+          to_city,
+          start_date,
+          end_date,
+          to_city_options: toCityOptions,
+          is_age_enabled: !!from_city,
+          enddate_visible: { value: !!start_date },
+        },
+      };
     }
-  };
+
+    if (currentScreenId === "SUMMARY_SCREEN") {
+      return {
+        screen: "TERMINAL_SCREEN",
+        data: { message: "Booking completed successfully!" },
+      };
+    }
+
+    return { screen: "TERMINAL_SCREEN", data: {} };
+  } catch (error) {
+    console.error("Error in getNextScreen:", error);
+    throw new FlowEndpointException("Error processing next screen", error);
+  }
 };
 
+
 module.exports = { flowWebhook, getNextScreen };
+a
