@@ -130,4 +130,3 @@ const getNextScreen = async (currentScreenId, inputData, userId) => {
 
 
 module.exports = { flowWebhook, getNextScreen };
-a
