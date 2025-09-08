@@ -13,19 +13,29 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ Mongo error:", err));
 
+/**
+ * Master response options (for dropdowns, etc.)
+ */
 const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
-    cities: [
-      { id: "HYD", title: "Hyderabad" },
-      { id: "MUM", title: "Mumbai" },
-      { id: "GOA", title: "Goa" }
+    travellers: [
+      { id: "T1", title: "1 Traveller" },
+      { id: "T2", title: "2 Travellers" }
+    ],
+    business_units: [
+      { id: "BU1", title: "Sales" },
+      { id: "BU2", title: "Engineering" }
+    ],
+    cost_centres: [
+      { id: "CC1", title: "Cost Centre 1" },
+      { id: "CC2", title: "Cost Centre 2" }
     ]
   }
 };
 
-const formatDate = (date) => date.toISOString().split("T")[0];
-
-// Flow Webhook
+/**
+ * Webhook entry
+ */
 const flowWebhook = async (req, res) => {
   if (!PRIVATE_KEY) throw new Error("Private key is empty");
   if (!isRequestSignatureValid(req)) return res.status(432).send();
@@ -34,7 +44,7 @@ const flowWebhook = async (req, res) => {
   try {
     decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
   } catch (err) {
-    console.error("Decryption failed:", err);
+    console.error("❌ Decryption failed:", err);
     if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
     return res.status(500).send();
   }
@@ -46,77 +56,68 @@ const flowWebhook = async (req, res) => {
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
-// Main logic
+/**
+ * Screen logic
+ */
 const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   try {
-    const today = new Date();
-    const maxDate = new Date();
-    maxDate.setDate(today.getDate() + 365);
-
     // ---------------- FLIGHT_BOOKING_SCREEN ----------------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
-      const { from_city, to_city, Startdate, Enddate } = inputData;
-
-      // Dynamic "to_city" options
-      const toCityOptions = from_city
-        ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== from_city)
-        : SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities;
+      const { travellers, business_unit, cost_centre } = inputData;
 
       // Validation
       const errors = [];
-      if (!from_city) errors.push("From city is required");
-      if (!to_city) errors.push("To city is required");
-      if (from_city && to_city && from_city === to_city) errors.push("From and To city cannot be the same");
-      if (!Startdate) errors.push("Startdate is required");
-      if (!Enddate) errors.push("Enddate is required");
-      if (Startdate && Enddate && new Date(Enddate) < new Date(Startdate))
-        errors.push("Enddate cannot be before Startdate");
+      if (!travellers) errors.push("Travellers selection is required");
+      if (!business_unit) errors.push("Business unit selection is required");
+      if (!cost_centre) errors.push("Cost centre selection is required");
 
       if (errors.length > 0) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
           data: {
             error: errors.join(", "),
-            from_city,
-            to_city,
-            Startdate,
-            Enddate,
-            to_city_options: toCityOptions,
-            calendar: {
-              min_date: formatDate(today),
-              max_date: formatDate(maxDate),
-              init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
-            }
+            travellers_options: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.travellers,
+            business_unit_options: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.business_units,
+            cost_centre_options: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cost_centres
           }
         };
       }
 
-      // All validations passed → save booking
-      await Booking.create({ userId, from_city, to_city, Startdate, Enddate });
+      // Save booking
+      await Booking.create({ userId, travellers, business_unit, cost_centre });
 
       // Go to SUMMARY_SCREEN
       return {
         screen: "SUMMARY_SCREEN",
-        data: { from_city, to_city, Startdate, Enddate }
+        data: {
+          confirm_details: [
+            `Travellers: ${travellers}`,
+            `Business Unit: ${business_unit}`,
+            `Cost Centre: ${cost_centre}`
+          ],
+          confirm_checkbox: true // ✅ Default ticked checkbox
+        }
       };
     }
 
     // ---------------- SUMMARY_SCREEN ----------------
     if (currentScreenId === "SUMMARY_SCREEN") {
-      const { from_city, to_city, Startdate, Enddate } = inputData;
-
-      // Only after Summary → go to TERMINAL
       return {
         screen: "TERMINAL_SCREEN",
-        data: { status: "Booking confirmed" }
+        data: {
+          status: "✅ Booking Confirmed"
+        }
       };
     }
 
     // ---------------- FALLBACK ----------------
-    return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
+    return {
+      screen: "TERMINAL_SCREEN",
+      data: { status: "✅ Booking Confirmed" }
+    };
 
   } catch (error) {
-    console.error("Error in getNextScreen:", error);
+    console.error("❌ Error in getNextScreen:", error);
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
