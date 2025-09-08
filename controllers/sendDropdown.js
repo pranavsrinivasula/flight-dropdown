@@ -29,29 +29,30 @@ const SCREEN_RESPONSES = {
 
 const formatDate = (date) => date.toISOString().split("T")[0];
 
-// Flow Webhook
+// ---------------- FLOW WEBHOOK ----------------
 const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) throw new Error("Private key is empty");
-  if (!isRequestSignatureValid(req)) return res.status(432).send();
-
-  let decryptedRequest;
   try {
-    decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+    if (!PRIVATE_KEY) throw new Error("Private key is empty");
+    if (!isRequestSignatureValid(req)) return res.status(432).send();
+
+    const decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
+
+    // LOG input for debugging
+    console.log("Decrypted request body:", JSON.stringify(decryptedBody, null, 2));
+
+    const { screen, data, userId } = decryptedBody;
+    const screenResponse = await getNextScreen(screen, data, userId);
+
+    res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
   } catch (err) {
-    console.error("Decryption failed:", err);
+    console.error("Webhook error:", err);
     if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
-    return res.status(500).send();
+    res.status(500).send();
   }
-
-  const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-
-  const { screen, data } = decryptedBody;
-
-  const screenResponse = await getNextScreen(screen, data, decryptedBody.userId);
-  res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
-// Main logic
+// ---------------- GET NEXT SCREEN ----------------
 const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   try {
     const today = new Date();
@@ -66,7 +67,6 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     const name = inputData.name || "";
     const age = inputData.age || "";
 
-    // Dynamic to_city options
     const toCityOptions = fromCityId
       ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCityId)
       : SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities;
@@ -76,8 +76,6 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
 
     // ---------------- FLIGHT_BOOKING_SCREEN ----------------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
-
-      // Validation errors
       const errors = [];
       if (!fromCityId) errors.push("From city is required");
       if (!toCityId) errors.push("To city is required");
@@ -109,7 +107,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // All validations passed, save booking
+      // All validations passed → save booking
       await Booking.create({
         userId,
         from_city: fromCityId,
@@ -122,29 +120,20 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
 
       return {
         screen: "SUMMARY_SCREEN",
-        data: {
-          from_city: fromCityId,
-          to_city: toCityId,
-          start_date,
-          end_date,
-          name,
-          age
-        }
+        data: { from_city: fromCityId, to_city: toCityId, start_date, end_date, name, age }
       };
     }
 
     // ---------------- SUMMARY_SCREEN ----------------
     if (currentScreenId === "SUMMARY_SCREEN") {
-      return {
-        screen: "TERMINAL_SCREEN",
-        data: { status: "Booking confirmed" }
-      };
+      return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
     }
 
     // ---------------- FALLBACK ----------------
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
+        error: "Please fill in all required fields",
         from_city: "",
         to_city: "",
         start_date: "",
@@ -164,8 +153,5 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
-
-
-
 
 module.exports = { flowWebhook, getNextScreen };
