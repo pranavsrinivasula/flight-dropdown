@@ -14,9 +14,10 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error("❌ Mongo error:", err));
 
 /**
- * Master response options (for dropdowns, etc.)
+ * Options used by the FLIGHT_BOOKING_SCREEN
+ * (keeps UI and API in sync)
  */
-const SCREEN_RESPONSES = {
+const SCREEN_OPTIONS = {
   FLIGHT_BOOKING_SCREEN: {
     travellers: [
       { id: "T1", title: "1 Traveller" },
@@ -29,43 +30,74 @@ const SCREEN_RESPONSES = {
     cost_centres: [
       { id: "CC1", title: "Cost Centre 1" },
       { id: "CC2", title: "Cost Centre 2" }
-    ]
+    ],
+    // confirm_details represented as string to satisfy flow validator
+    confirm_details_default: "true"
   }
 };
 
 /**
- * Webhook entry
+ * Webhook entry point called by the flow engine.
+ * Decrypts incoming payload, computes next response, encrypts outgoing response.
  */
 const flowWebhook = async (req, res) => {
-  if (!PRIVATE_KEY) throw new Error("Private key is empty");
-  if (!isRequestSignatureValid(req)) return res.status(432).send();
-
-  let decryptedRequest;
   try {
-    decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+    if (!PRIVATE_KEY) throw new Error("Private key is empty");
+    if (!isRequestSignatureValid(req)) return res.status(432).send();
+
+    let decryptedRequest;
+    try {
+      decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+    } catch (err) {
+      console.error("❌ Decryption failed:", err);
+      if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
+      return res.status(500).send();
+    }
+
+    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
+    const { screen, data, userId } = decryptedBody;
+
+    const responsePayload = await getNextScreen(screen, data || {}, userId);
+    const encrypted = encryptResponse(responsePayload, aesKeyBuffer, initialVectorBuffer);
+    return res.send(encrypted);
+
   } catch (err) {
-    console.error("❌ Decryption failed:", err);
-    if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
+    console.error("❌ flowWebhook error:", err);
+    // If you want, send a safe minimal response to the flow engine
     return res.status(500).send();
   }
-
-  const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-  const { screen, data } = decryptedBody;
-
-  const screenResponse = await getNextScreen(screen, data, decryptedBody.userId);
-  res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 };
 
 /**
- * Screen logic
+ * Main logic that decides the next response.
+ *
+ * IMPORTANT:
+ * - For normal navigation we return { screen: "...", data: {...} }
+ * - For the final resolution expected by your engine we return { data: { status: "active" } }
+ *   (i.e. no `screen` key, which matches your Expected result)
  */
 const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   try {
-    // ---------------- FLIGHT_BOOKING_SCREEN ----------------
+    // ------------- FLIGHT_BOOKING_SCREEN (initial / validate) -------------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
       const { travellers, business_unit, cost_centre } = inputData;
 
-      // Validation
+      // If it's the very first call (no selections), return the screen with options
+      const isInitialLoad = !travellers && !business_unit && !cost_centre;
+      if (isInitialLoad) {
+        return {
+          screen: "FLIGHT_BOOKING_SCREEN",
+          data: {
+            travellers: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.travellers,
+            business_units: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.business_units,
+            cost_centres: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.cost_centres,
+            // keep confirm field as string "true" so UI loads checkbox checked by default
+            confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default
+          }
+        };
+      }
+
+      // Validation: if any required field missing, return same screen with an error (and options so UI can render)
       const errors = [];
       if (!travellers) errors.push("Travellers selection is required");
       if (!business_unit) errors.push("Business unit selection is required");
@@ -76,48 +108,43 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
           screen: "FLIGHT_BOOKING_SCREEN",
           data: {
             error: errors.join(", "),
-            travellers_options: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.travellers,
-            business_unit_options: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.business_units,
-            cost_centre_options: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cost_centres
+            travellers: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.travellers,
+            business_units: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.business_units,
+            cost_centres: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.cost_centres,
+            confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default
           }
         };
       }
 
-      // Save booking
+      // All good -> persist booking and navigate to summary
       await Booking.create({ userId, travellers, business_unit, cost_centre });
 
-      // Go to SUMMARY_SCREEN
       return {
         screen: "SUMMARY_SCREEN",
         data: {
-          confirm_details: [
-            `Travellers: ${travellers}`,
-            `Business Unit: ${business_unit}`,
-            `Cost Centre: ${cost_centre}`
-          ],
-          confirm_checkbox: true // ✅ Default ticked checkbox
+          // return the selections as strings (title or id depending on what your UI expects)
+          travellers,
+          business_unit,
+          cost_centre,
+          confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default
         }
       };
     }
 
-    // ---------------- SUMMARY_SCREEN ----------------
+    // ------------- SUMMARY_SCREEN (user confirms on summary) -------------
     if (currentScreenId === "SUMMARY_SCREEN") {
-      return {
-        screen: "TERMINAL_SCREEN",
-        data: {
-          status: "✅ Booking Confirmed"
-        }
-      };
+      // Your flow engine expects the final resolution in this exact shape:
+      // { "data": { "status": "active" } }
+      return { data: { status: "active" } };
     }
 
-    // ---------------- FALLBACK ----------------
-    return {
-      screen: "TERMINAL_SCREEN",
-      data: { status: "✅ Booking Confirmed" }
-    };
+    // ------------- FALLBACK / TERMINAL -------------
+    // For any other terminal/fallback cases also return resolution shape expected
+    return { data: { status: "active" } };
 
   } catch (error) {
     console.error("❌ Error in getNextScreen:", error);
+    // Throw FlowEndpointException so the caller can map to an appropriate HTTP status
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
