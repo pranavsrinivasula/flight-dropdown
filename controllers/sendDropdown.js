@@ -124,7 +124,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
 }
 
     // ---------------- FALLBACK ----------------
-    return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
+    return { screen: "TERMINAL_SCREEN", data: { status: "Booking active" } };
 
   } catch (error) {
     console.error("Error in getNextScreen:", error);
