@@ -58,7 +58,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     const maxDate = new Date();
     maxDate.setDate(today.getDate() + 365);
 
-    // Normalize from_city and to_city to strings
+    // Normalize input
     const fromCityId = inputData.from_city || "";
     const toCityId = inputData.to_city || "";
     const { start_date, end_date, name, age } = inputData;
@@ -66,9 +66,12 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     // Prepare dynamic to_city options
     const toCityOptions = fromCityId
       ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCityId)
-      : [{ id: "", title: "Select From City first" }];
+      : SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities;
 
-    // ----------- FLIGHT_BOOKING_SCREEN LOGIC -------------
+    const isToCityEnabled = !!fromCityId;
+    const toCityVisible = !!fromCityId;
+
+    // ---------------- FLIGHT_BOOKING_SCREEN ----------------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
       // Validation: From & To cannot be same
       if (fromCityId && toCityId && fromCityId === toCityId) {
@@ -80,8 +83,8 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
             to_city: toCityId,
             to_city_options: toCityOptions,
             is_age_enabled: !!fromCityId,
-            is_to_city_enabled: !!fromCityId,
-            to_city_visible: !!fromCityId,
+            is_to_city_enabled: isToCityEnabled,
+            to_city_visible: toCityVisible,
             enddate_visible: { value: !!start_date },
             calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
             trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
@@ -100,8 +103,8 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
             to_city: toCityId,
             to_city_options: toCityOptions,
             is_age_enabled: !!fromCityId,
-            is_to_city_enabled: !!fromCityId,
-            to_city_visible: !!fromCityId,
+            is_to_city_enabled: isToCityEnabled,
+            to_city_visible: toCityVisible,
             enddate_visible: { value: !!start_date },
             calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
             trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
@@ -145,8 +148,8 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
           end_date: end_date || "",
           to_city_options: toCityOptions,
           is_age_enabled: !!fromCityId,
-          is_to_city_enabled: !!fromCityId,
-          to_city_visible: !!fromCityId,
+          is_to_city_enabled: isToCityEnabled,
+          to_city_visible: toCityVisible,
           enddate_visible: { value: !!start_date },
           calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
           trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
@@ -155,7 +158,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
       };
     }
 
-    // ----------- SUMMARY_SCREEN LOGIC -------------
+    // ---------------- SUMMARY_SCREEN ----------------
     if (currentScreenId === "SUMMARY_SCREEN") {
       return {
         screen: "TERMINAL_SCREEN",
@@ -163,7 +166,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
       };
     }
 
-    // ----------- FALLBACK (safety) -------------
+    // ---------------- FALLBACK ----------------
     return {
       screen: "FLIGHT_BOOKING_SCREEN",
       data: {
@@ -186,6 +189,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
+
 
 
 module.exports = { flowWebhook, getNextScreen };
