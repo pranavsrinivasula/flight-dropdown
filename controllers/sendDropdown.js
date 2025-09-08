@@ -112,7 +112,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   if (inputData._proceed) {
     return {
       screen: "TERMINAL_SCREEN",
-      data: { status: "Booking confirmed" }
+      data: { status: "active" }
     };
   }
 
