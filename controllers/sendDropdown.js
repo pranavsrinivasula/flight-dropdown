@@ -44,7 +44,6 @@ const flowWebhook = async (req, res) => {
   }
 
   const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-
   const { screen, data } = decryptedBody;
 
   const screenResponse = await getNextScreen(screen, data, decryptedBody.userId);
@@ -58,57 +57,54 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     const maxDate = new Date();
     maxDate.setDate(today.getDate() + 365);
 
+    // ---------------- FLIGHT_BOOKING_SCREEN ----------------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
-      const { from_city, to_city, start_date, end_date } = inputData;
+      const { from_city, to_city, Startdate, Enddate } = inputData;
 
       // Dynamic "to_city" options
       const toCityOptions = from_city
-        ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== from_city.id)
-        : [{ id: "", title: "Select From City first" }];
+        ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== from_city)
+        : SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities;
 
       // Validation
-      if (from_city && to_city && from_city === to_city) {
+      const errors = [];
+      if (!from_city) errors.push("From city is required");
+      if (!to_city) errors.push("To city is required");
+      if (from_city && to_city && from_city === to_city) errors.push("From and To city cannot be the same");
+      if (!Startdate) errors.push("Startdate is required");
+      if (!Enddate) errors.push("Enddate is required");
+      if (Startdate && Enddate && new Date(Enddate) < new Date(Startdate))
+        errors.push("Enddate cannot be before Startdate");
+
+      if (errors.length > 0) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
-          data: { error: "From and To city cannot be the same", to_city_options: toCityOptions }
+          data: {
+            error: errors.join(", "),
+            from_city,
+            to_city,
+            Startdate,
+            Enddate,
+            to_city_options: toCityOptions,
+            calendar: {
+              min_date: formatDate(today),
+              max_date: formatDate(maxDate),
+              init_value: { start_date: formatDate(today), end_date: formatDate(maxDate) }
+            }
+          }
         };
       }
 
-      if (start_date && end_date && new Date(end_date) < new Date(start_date)) {
-        return {
-          screen: "FLIGHT_BOOKING_SCREEN",
-          data: { error: "End date cannot be before start date", to_city_options: toCityOptions }
-        };
-      }
+      // All validations passed, save booking
+      await Booking.create({ userId, from_city, to_city, Startdate, Enddate });
 
-      // Proceed if all required fields filled
-      if (from_city && to_city && start_date && end_date) {
-        await Booking.create({ userId, from_city, to_city, start_date, end_date });
-        return {
-          screen: "SUMMARY_SCREEN",
-          data: { from_city, to_city, start_date, end_date }
-        };
-      }
-
-      // Return same screen with updated options & flags
       return {
-        screen: "FLIGHT_BOOKING_SCREEN",
-        data: {
-          from_city,
-          to_city,
-          start_date,
-          end_date,
-          to_city_options: toCityOptions,
-          is_age_enabled: !!from_city,
-          is_to_city_enabled: !!from_city,
-          enddate_visible: { value: !!start_date },
-          calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-          cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities
-        }
+        screen: "SUMMARY_SCREEN",
+        data: { from_city, to_city, Startdate, Enddate }
       };
     }
 
+    // ---------------- SUMMARY_SCREEN ----------------
     if (currentScreenId === "SUMMARY_SCREEN") {
       return {
         screen: "TERMINAL_SCREEN",
@@ -116,7 +112,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
       };
     }
 
-    // Default fallback
+    // ---------------- FALLBACK ----------------
     return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
 
   } catch (error) {
