@@ -58,12 +58,15 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     const maxDate = new Date();
     maxDate.setDate(today.getDate() + 365);
 
-    // Normalize input
+    // Defensive input parsing
     const fromCityId = inputData.from_city || "";
     const toCityId = inputData.to_city || "";
-    const { start_date, end_date, name, age } = inputData;
+    const start_date = inputData.start_date || "";
+    const end_date = inputData.end_date || "";
+    const name = inputData.name || "";
+    const age = inputData.age || "";
 
-    // Prepare dynamic to_city options
+    // Dynamic to_city options
     const toCityOptions = fromCityId
       ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== fromCityId)
       : SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities;
@@ -73,14 +76,27 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
 
     // ---------------- FLIGHT_BOOKING_SCREEN ----------------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
-      // Validation: From & To cannot be same
-      if (fromCityId && toCityId && fromCityId === toCityId) {
+
+      // Validation errors
+      const errors = [];
+      if (!fromCityId) errors.push("From city is required");
+      if (!toCityId) errors.push("To city is required");
+      if (fromCityId && toCityId && fromCityId === toCityId) errors.push("From and To city cannot be the same");
+      if (!start_date) errors.push("Start date is required");
+      if (!end_date) errors.push("End date is required");
+      if (start_date && end_date && new Date(end_date) < new Date(start_date)) errors.push("End date cannot be before start date");
+      if (!name) errors.push("Name is required");
+      if (!age && !!fromCityId) errors.push("Age is required");
+
+      if (errors.length > 0) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
           data: {
-            error: "From and To city cannot be the same",
+            error: errors.join(", "),
             from_city: fromCityId,
             to_city: toCityId,
+            start_date,
+            end_date,
             to_city_options: toCityOptions,
             is_age_enabled: !!fromCityId,
             is_to_city_enabled: isToCityEnabled,
@@ -93,67 +109,26 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // Validation: End date after start date
-      if (start_date && end_date && new Date(end_date) < new Date(start_date)) {
-        return {
-          screen: "FLIGHT_BOOKING_SCREEN",
-          data: {
-            error: "End date cannot be before start date",
-            from_city: fromCityId,
-            to_city: toCityId,
-            to_city_options: toCityOptions,
-            is_age_enabled: !!fromCityId,
-            is_to_city_enabled: isToCityEnabled,
-            to_city_visible: toCityVisible,
-            enddate_visible: { value: !!start_date },
-            calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities
-          }
-        };
-      }
+      // All validations passed, save booking
+      await Booking.create({
+        userId,
+        from_city: fromCityId,
+        to_city: toCityId,
+        start_date,
+        end_date,
+        name,
+        age
+      });
 
-      // Proceed if all required fields filled
-      if (fromCityId && toCityId && start_date && end_date) {
-        await Booking.create({
-          userId,
+      return {
+        screen: "SUMMARY_SCREEN",
+        data: {
           from_city: fromCityId,
           to_city: toCityId,
           start_date,
           end_date,
           name,
           age
-        });
-
-        return {
-          screen: "SUMMARY_SCREEN",
-          data: {
-            from_city: fromCityId,
-            to_city: toCityId,
-            start_date,
-            end_date,
-            name,
-            age
-          }
-        };
-      }
-
-      // Return same screen with updated options & flags
-      return {
-        screen: "FLIGHT_BOOKING_SCREEN",
-        data: {
-          from_city: fromCityId,
-          to_city: toCityId,
-          start_date: start_date || "",
-          end_date: end_date || "",
-          to_city_options: toCityOptions,
-          is_age_enabled: !!fromCityId,
-          is_to_city_enabled: isToCityEnabled,
-          to_city_visible: toCityVisible,
-          enddate_visible: { value: !!start_date },
-          calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
-          trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
-          cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities
         }
       };
     }
@@ -189,6 +164,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
+
 
 
 
