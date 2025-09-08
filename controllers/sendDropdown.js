@@ -66,18 +66,43 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         ? SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities.filter(c => c.id !== from_city.id)
         : [{ id: "", title: "Select From City first" }];
 
-      // Validation
-      if (from_city && to_city && from_city === to_city) {
+      // Validation: From & To cannot be same
+      if (from_city && to_city && from_city.id === to_city.id) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
-          data: { error: "From and To city cannot be the same", to_city_options: toCityOptions }
+          data: {
+            error: "From and To city cannot be the same",
+            from_city,
+            to_city,
+            to_city_options: toCityOptions,
+            is_age_enabled: !!from_city,
+            is_to_city_enabled: !!from_city,
+            to_city_visible: !!from_city,
+            enddate_visible: { value: !!start_date },
+            calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities
+          }
         };
       }
 
+      // Validation: End date after start date
       if (start_date && end_date && new Date(end_date) < new Date(start_date)) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
-          data: { error: "End date cannot be before start date", to_city_options: toCityOptions }
+          data: {
+            error: "End date cannot be before start date",
+            from_city,
+            to_city,
+            to_city_options: toCityOptions,
+            is_age_enabled: !!from_city,
+            is_to_city_enabled: !!from_city,
+            to_city_visible: !!from_city,
+            enddate_visible: { value: !!start_date },
+            calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
+            trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
+            cities: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.cities
+          }
         };
       }
 
@@ -101,6 +126,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
           to_city_options: toCityOptions,
           is_age_enabled: !!from_city,
           is_to_city_enabled: !!from_city,
+          to_city_visible: !!from_city,
           enddate_visible: { value: !!start_date },
           calendar: { min_date: formatDate(today), max_date: formatDate(maxDate) },
           trip_types: SCREEN_RESPONSES.FLIGHT_BOOKING_SCREEN.trip_types,
