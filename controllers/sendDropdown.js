@@ -15,10 +15,6 @@ mongoose.connect(process.env.MONGO_URI)
 
 const SCREEN_RESPONSES = {
   FLIGHT_BOOKING_SCREEN: {
-    trip_types: [
-      { id: "HYD_TO_MUMBAI", title: "HYD TO MUMBAI" },
-      { id: "HYD_TO_GOA", title: "HYD TO GOA" }
-    ],
     cities: [
       { id: "HYD", title: "Hyderabad" },
       { id: "MUM", title: "Mumbai" },
@@ -95,9 +91,10 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // All validations passed, save booking
+      // All validations passed → save booking
       await Booking.create({ userId, from_city, to_city, Startdate, Enddate });
 
+      // Go to SUMMARY_SCREEN
       return {
         screen: "SUMMARY_SCREEN",
         data: { from_city, to_city, Startdate, Enddate }
@@ -105,26 +102,18 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     }
 
     // ---------------- SUMMARY_SCREEN ----------------
-   if (currentScreenId === "SUMMARY_SCREEN") {
-  const { from_city, to_city, Startdate, Enddate } = inputData;
+    if (currentScreenId === "SUMMARY_SCREEN") {
+      const { from_city, to_city, Startdate, Enddate } = inputData;
 
-  // If user clicked Continue on SUMMARY_SCREEN, then go to TERMINAL
-  if (inputData._proceed) {
-    return {
-      screen: "TERMINAL_SCREEN",
-      data: { status: "active" }
-    };
-  }
-
-  // Otherwise, just show the summary data
-  return {
-    screen: "SUMMARY_SCREEN",
-    data: { from_city, to_city, Startdate, Enddate }
-  };
-}
+      // Only after Summary → go to TERMINAL
+      return {
+        screen: "TERMINAL_SCREEN",
+        data: { status: "Booking confirmed" }
+      };
+    }
 
     // ---------------- FALLBACK ----------------
-    return { screen: "TERMINAL_SCREEN", data: { status: "Booking active" } };
+    return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
 
   } catch (error) {
     console.error("Error in getNextScreen:", error);
