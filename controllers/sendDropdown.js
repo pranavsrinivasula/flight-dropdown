@@ -105,12 +105,23 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     }
 
     // ---------------- SUMMARY_SCREEN ----------------
-    if (currentScreenId === "SUMMARY_SCREEN") {
-      return {
-        screen: "TERMINAL_SCREEN",
-        data: { status: "Booking confirmed" }
-      };
-    }
+   if (currentScreenId === "SUMMARY_SCREEN") {
+  const { from_city, to_city, Startdate, Enddate } = inputData;
+
+  // If user clicked Continue on SUMMARY_SCREEN, then go to TERMINAL
+  if (inputData._proceed) {
+    return {
+      screen: "TERMINAL_SCREEN",
+      data: { status: "Booking confirmed" }
+    };
+  }
+
+  // Otherwise, just show the summary data
+  return {
+    screen: "SUMMARY_SCREEN",
+    data: { from_city, to_city, Startdate, Enddate }
+  };
+}
 
     // ---------------- FALLBACK ----------------
     return { screen: "TERMINAL_SCREEN", data: { status: "Booking confirmed" } };
