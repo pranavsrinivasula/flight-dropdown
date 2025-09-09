@@ -133,10 +133,24 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
 
     // ------------- SUMMARY_SCREEN (user confirms on summary) -------------
     if (currentScreenId === "SUMMARY_SCREEN") {
-      // Your flow engine expects the final resolution in this exact shape:
-      // { "data": { "status": "active" } }
-      return { data: { status: "active" } };
+  const { from_city, to_city, via_city, final_city } = inputData || {};
+
+  // Determine visibility flags
+  const show_via = from_city && to_city ? true : false;
+  const show_final = via_city ? true : false;
+
+  return {
+    screen: "SUMMARY_SCREEN",
+    data: {
+      from_city: from_city || "",
+      to_city: to_city || "",
+      via_city: via_city || "",
+      final_city: final_city || "",
+      show_via,
+      show_final
     }
+  };
+}
 
     // ------------- FALLBACK / TERMINAL -------------
     // For any other terminal/fallback cases also return resolution shape expected
