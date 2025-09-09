@@ -78,12 +78,11 @@ const flowWebhook = async (req, res) => {
  */
 const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   try {
-    // ------------- FLIGHT_BOOKING_SCREEN (initial / validate) -------------
+    // ----------- FLIGHT_BOOKING_SCREEN (initial) -----------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
       const { travellers, business_unit, cost_centre } = inputData;
-
-      // If it's the very first call (no selections), return the screen with options
       const isInitialLoad = !travellers && !business_unit && !cost_centre;
+
       if (isInitialLoad) {
         return {
           screen: "FLIGHT_BOOKING_SCREEN",
@@ -91,13 +90,12 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
             travellers: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.travellers,
             business_units: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.business_units,
             cost_centres: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.cost_centres,
-            // keep confirm field as string "true" so UI loads checkbox checked by default
             confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default
           }
         };
       }
 
-      // Validation: if any required field missing, return same screen with an error (and options so UI can render)
+      // validation
       const errors = [];
       if (!travellers) errors.push("Travellers selection is required");
       if (!business_unit) errors.push("Business unit selection is required");
@@ -116,49 +114,68 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // All good -> persist booking and navigate to summary
+      // Save to DB
       await Booking.create({ userId, travellers, business_unit, cost_centre });
 
+      // move to summary screen
       return {
         screen: "SUMMARY_SCREEN",
         data: {
-          // return the selections as strings (title or id depending on what your UI expects)
-          travellers,
-          business_unit,
-          cost_centre,
-          confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default
+          from_city: "",
+          to_city: "",
+          via_city: "",
+          final_city: "",
+          show_via: false,
+          show_final: false
         }
       };
     }
 
-    // ------------- SUMMARY_SCREEN (user confirms on summary) -------------
+    // ----------- SUMMARY_SCREEN (user fills cities) -----------
     if (currentScreenId === "SUMMARY_SCREEN") {
-  const { from_city, to_city, via_city, final_city } = inputData || {};
+      const { from_city, to_city, via_city, final_city, show_via, show_final } = inputData;
 
-  // Determine visibility flags
-  const show_via = from_city && to_city ? true : false;
-  const show_final = via_city ? true : false;
+      // case: only from/to filled
+      if (from_city && to_city && !show_via) {
+        return {
+          screen: "SUMMARY_SCREEN",
+          data: {
+            ...inputData,
+            show_via: true // enable via dropdown
+          }
+        };
+      }
 
-  return {
-    screen: "SUMMARY_SCREEN",
-    data: {
-      from_city: from_city || "",
-      to_city: to_city || "",
-      via_city: via_city || "",
-      final_city: final_city || "",
-      show_via,
-      show_final
+      // case: via filled, now enable final
+      if (via_city && !show_final) {
+        return {
+          screen: "SUMMARY_SCREEN",
+          data: {
+            ...inputData,
+            show_final: true
+          }
+        };
+      }
+
+      // case: all selected, end flow
+      if (from_city && to_city && via_city && final_city) {
+        return {
+          data: { status: "active" }
+        };
+      }
+
+      // fallback → keep on summary until complete
+      return {
+        screen: "SUMMARY_SCREEN",
+        data: inputData
+      };
     }
-  };
-}
 
-    // ------------- FALLBACK / TERMINAL -------------
-    // For any other terminal/fallback cases also return resolution shape expected
+    // ----------- FALLBACK -----------
     return { data: { status: "active" } };
 
   } catch (error) {
     console.error("❌ Error in getNextScreen:", error);
-    // Throw FlowEndpointException so the caller can map to an appropriate HTTP status
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
