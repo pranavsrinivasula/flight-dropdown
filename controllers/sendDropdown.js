@@ -121,44 +121,50 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     }
 
     // ----------- SUMMARY_SCREEN -----------
-    if (currentScreenId === "SUMMARY_SCREEN") {
-      const { from_city, to_city, via_city, final_city, show_via, show_final } = inputData;
+ // ----------- SUMMARY_SCREEN -----------
+if (currentScreenId === "SUMMARY_SCREEN") {
+  const { from_city, to_city, via_city, final_city, show_via, show_final } =
+    inputData;
 
-      // Step 1: after from + to → unlock via
-      if (from_city && to_city && !show_via) {
-        return {
-          screen: "SUMMARY_SCREEN",
-          data: { ...inputData, show_via: true },
-        };
-      }
+  // Step 1: after from + to → unlock via
+  if (from_city && to_city && !show_via) {
+    return {
+      screen: "SUMMARY_SCREEN",
+      data: { ...inputData, show_via: true },
+    };
+  }
 
-      // Step 2: after via → unlock final
-      if (via_city && !show_final) {
-        return {
-          screen: "SUMMARY_SCREEN",
-          data: { ...inputData, show_final: true },
-        };
-      }
+  // Step 2: after via → unlock final
+  if (via_city && !show_final) {
+    return {
+      screen: "SUMMARY_SCREEN",
+      data: { ...inputData, show_final: true },
+    };
+  }
 
-      // Step 3: after all filled → move to TERMINAL_SCREEN
-      if (from_city && to_city && via_city && final_city) {
-        return {
-          screen: "TERMINAL_SCREEN",
-          data: { status: "active" },
-        };
-      }
+  // Step 3: after all filled → move to TERMINAL_SCREEN
+  if (from_city && to_city && via_city && final_city) {
+    return {
+      screen: "TERMINAL_SCREEN",   // ✅ must include screen
+      data: { status: "active" },
+    };
+  }
 
-      // Default: return same summary
-      return {
-        screen: "SUMMARY_SCREEN",
-        data: inputData,
-      };
-    }
+  // Default: return same summary
+  return {
+    screen: "SUMMARY_SCREEN",
+    data: inputData,
+  };
+}
 
-    // ----------- TERMINAL_SCREEN -----------
-    if (currentScreenId === "TERMINAL_SCREEN") {
-      return { data: { status: "active" } };
-    }
+// ----------- TERMINAL_SCREEN -----------
+if (currentScreenId === "TERMINAL_SCREEN") {
+  return {
+    screen: "TERMINAL_SCREEN",   // ✅ must include screen
+    data: { status: "active" },
+  };
+}
+
 
     // ----------- Fallback -----------
     return { data: { status: "active" } };
