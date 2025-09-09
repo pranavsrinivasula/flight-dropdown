@@ -78,7 +78,7 @@ const flowWebhook = async (req, res) => {
  */
 const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
   try {
-    // ----------- FLIGHT_BOOKING_SCREEN (initial booking details) -----------
+    // ----------- FLIGHT_BOOKING_SCREEN (keep as is) -----------
     if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
       const { travellers, business_unit, cost_centre } = inputData;
       const isInitialLoad = !travellers && !business_unit && !cost_centre;
@@ -96,7 +96,6 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // validation
       const errors = [];
       if (!travellers) errors.push("Travellers selection is required");
       if (!business_unit) errors.push("Business unit selection is required");
@@ -116,10 +115,8 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // Save booking
       await Booking.create({ userId, travellers, business_unit, cost_centre });
 
-      // move to SUMMARY_SCREEN (start city selection)
       return {
         screen: "SUMMARY_SCREEN",
         data: {
@@ -133,12 +130,12 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
       };
     }
 
-    // ----------- SUMMARY_SCREEN (step-by-step city selection) -----------
+    // ----------- SUMMARY_SCREEN (step-by-step dropdowns) -----------
     if (currentScreenId === "SUMMARY_SCREEN") {
       const { from_city, to_city, via_city, final_city, show_via, show_final } =
         inputData;
 
-      // Step 1 → Only when from & to are chosen, unlock via dropdown
+      // Step 1 → enable via after from+to selected
       if (from_city && to_city && !show_via) {
         return {
           screen: "SUMMARY_SCREEN",
@@ -149,7 +146,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // Step 2 → After via selected, unlock final dropdown
+      // Step 2 → enable final after via selected
       if (via_city && !show_final) {
         return {
           screen: "SUMMARY_SCREEN",
@@ -160,24 +157,28 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
         };
       }
 
-      // Step 3 → Once all cities selected → end flow
+      // Step 3 → all filled → flow complete
       if (from_city && to_city && via_city && final_city) {
         return {
-          screen: "TERMINAL_SCREEN", // ✅ always return screen
-          data: { status: "active" },
+          // ⚠️ Must still return screen (engine requirement)
+          screen: "SUMMARY_SCREEN",
+          data: {
+            ...inputData,
+            status: "active",
+          },
         };
       }
 
-      // Default → keep showing summary screen
+      // Default → stay on summary
       return {
         screen: "SUMMARY_SCREEN",
         data: inputData,
       };
     }
 
-    // ----------- TERMINAL / fallback -----------
+    // ----------- Fallback (unchanged) -----------
     return {
-      screen: "TERMINAL_SCREEN",
+      screen: "SUMMARY_SCREEN",
       data: { status: "active" },
     };
   } catch (error) {
@@ -185,6 +186,7 @@ const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
     throw new FlowEndpointException("Error processing next screen", error);
   }
 };
+
 
 
 module.exports = { flowWebhook, getNextScreen };
