@@ -2,7 +2,6 @@
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 const { isRequestSignatureValid } = require("../middleware/valid");
 const mongoose = require("mongoose");
-const Booking = require("../models/Booking");
 require("dotenv").config();
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
@@ -13,26 +12,12 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ Mongo error:", err));
 
-/**
- * Options used by the FLIGHT_BOOKING_SCREEN
- */
-const SCREEN_OPTIONS = {
-  FLIGHT_BOOKING_SCREEN: {
-    travellers: [
-      { id: "T1", title: "1 Traveller" },
-      { id: "T2", title: "2 Travellers" }
-    ],
-    business_units: [
-      { id: "BU1", title: "Sales" },
-      { id: "BU2", title: "Engineering" }
-    ],
-    cost_centres: [
-      { id: "CC1", title: "Cost Centre 1" },
-      { id: "CC2", title: "Cost Centre 2" }
-    ],
-    confirm_details_default: "true"
-  }
-};
+// Sample flight data
+const FLIGHT_LIST = [
+  { id: "AI203", title: "Air India AI-203" },
+  { id: "6E512", title: "IndiGo 6E-512" },
+  { id: "UK811", title: "Vistara UK-811" }
+];
 
 /**
  * Webhook entry point
@@ -52,9 +37,9 @@ const flowWebhook = async (req, res) => {
     }
 
     const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-    const { screen, data, userId } = decryptedBody;
+    const { screen, data, userId, trigger } = decryptedBody;
 
-    const responsePayload = await getNextScreen(screen, data || {}, userId);
+    const responsePayload = await getNextScreen(screen, data || {}, trigger);
     const encrypted = encryptResponse(responsePayload, aesKeyBuffer, initialVectorBuffer);
     return res.send(encrypted);
 
@@ -67,97 +52,48 @@ const flowWebhook = async (req, res) => {
 /**
  * Screen navigation logic
  */
-const getNextScreen = async (currentScreenId, inputData = {}, userId) => {
+const getNextScreen = async (currentScreenId, inputData = {}, trigger) => {
   try {
-    // ----------- FLIGHT_BOOKING_SCREEN -----------
-    if (currentScreenId === "FLIGHT_BOOKING_SCREEN") {
-      const { travellers, business_unit, cost_centre } = inputData;
-      const isInitialLoad = !travellers && !business_unit && !cost_centre;
-
-      if (isInitialLoad) {
+    // ----------- SEARCH SCREEN -----------
+    if (currentScreenId === "SEARCH") {
+      // If user clicked "Show Flights List" link → populate flight list
+      if (trigger === "FETCH_FLIGHTS") {
         return {
-          screen: "FLIGHT_BOOKING_SCREEN",
+          screen: "SEARCH",
           data: {
-            travellers: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.travellers,
-            business_units: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.business_units,
-            cost_centres: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.cost_centres,
-            confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default,
-          },
+            Available_flights_list_temp: FLIGHT_LIST
+          }
         };
       }
 
-      const errors = [];
-      if (!travellers) errors.push("Travellers selection is required");
-      if (!business_unit) errors.push("Business unit selection is required");
-      if (!cost_centre) errors.push("Cost centre selection is required");
-
-      if (errors.length > 0) {
+      // If user selected a flight from dropdown
+      if (inputData.selected_flight) {
         return {
-          screen: "FLIGHT_BOOKING_SCREEN",
+          screen: "SEARCH",
           data: {
-            error: errors.join(", "),
-            travellers: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.travellers,
-            business_units: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.business_units,
-            cost_centres: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.cost_centres,
-            confirm_details: SCREEN_OPTIONS.FLIGHT_BOOKING_SCREEN.confirm_details_default,
-          },
+            Available_flights_list_temp: FLIGHT_LIST,
+            selected_flight_option: inputData.selected_flight
+          }
         };
       }
 
-      // Save booking
-      await Booking.create({ userId, travellers, business_unit, cost_centre });
-
+      // Initial load → empty flight list
       return {
-        screen: "SUMMARY_SCREEN",
+        screen: "SEARCH",
         data: {
-          from_city: "",
-          to_city: "",
-          via_city: "",
-          final_city: "",
-          show_via: false,
-          show_final: false,
-        },
+          Available_flights_list_temp: [],
+          selected_flight_option: ""
+        }
       };
     }
 
- // ----------- SUMMARY_SCREEN -----------
-if (currentScreenId === "SUMMARY_SCREEN") {
-  const { from_city, to_city, via_city, final_city, show_via, show_final } =
-    inputData;
-
-  // Step 1: after from + to → unlock via
-  if (from_city && to_city && !show_via) {
-    return {
-      data: { ...inputData, show_via: true },
-    };
-  }
-
-  // Step 2: after via → unlock final
-  if (via_city && !show_final) {
-    return {
-      data: { ...inputData, show_final: true },
-    };
-  }
-
-  // Step 3: after all filled → move to TERMINAL_SCREEN
-  if (from_city && to_city && via_city && final_city) {
-    return {  
-      screen: "TERMINAL_SCREEN",   // ✅ must include screen
-      data: { status: "active" },
-    };
-  }
-
-
-}
-
-// ----------- TERMINAL_SCREEN -----------
-if (currentScreenId === "TERMINAL_SCREEN") {
-  return {
-    screen: "TERMINAL_SCREEN",   // ✅ must include screen
-    data: { status: "active" },
-  };
-}
-
+    // ----------- TERMINAL SCREEN -----------
+    if (currentScreenId === "TERMINAL_SCREEN") {
+      return {
+        screen: "TERMINAL_SCREEN",
+        data: { status: "active" }
+      };
+    }
 
     // ----------- Fallback -----------
     return { data: { status: "active" } };
