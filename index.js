@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const { flowRouter } = require("./routes/flowRoutes");
+const { flowRouter } = require("./routes/routes");
 const mongoose = require("mongoose");
 
 const app = express();
