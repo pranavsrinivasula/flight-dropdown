@@ -46,6 +46,9 @@ const flowController = async (req, res) => {
     };
 
     const encryptedPayload = encryptResponse(responseData, aesKeyBuffer, initialVectorBuffer);
+    console.log("PRIVATE_KEY:", process.env.PRIVATE_KEY ? "Loaded" : "Not loaded");
+console.log("PRIVATE_KEY_PASSPHRASE:", process.env.PRIVATE_KEY_PASSPHRASE ? "Loaded" : "Not loaded");
+
     return res.json({ encrypted_flow_data: encryptedPayload });
 
   } catch (err) {
@@ -54,6 +57,7 @@ const flowController = async (req, res) => {
       return res.status(err.statusCode).json({ error: err.message });
     }
     return res.status(500).json({ error: err.message });
+    
   }
 };
 
