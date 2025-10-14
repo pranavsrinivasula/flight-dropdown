@@ -12,6 +12,12 @@ let isSearchEnabled = false;
 
 const flowController = async (req, res) => {
   try {
+    // Step 0: Check for health check ping
+    if (req.body?.action === "ping") {
+      console.log("🟢 Health check ping received");
+      return res.json({ data: { status: "active" } });
+    }
+
     // Step 1: Decrypt incoming request
     const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
     const { trigger, query, selected_result } = decryptedBody;
@@ -60,5 +66,6 @@ const flowController = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
 
 module.exports = { flowController };
