@@ -12,49 +12,27 @@ let isSearchEnabled = false;
 
 const flowController = async (req, res) => {
   try {
-    // Step 0: Check for health check ping
+    // 0️⃣ Handle WhatsApp health check ping
     if (req.body?.action === "ping") {
       console.log("🟢 Health check ping received");
       return res.json({ data: { status: "active" } });
     }
 
-    // Step 1: Decrypt incoming request
+    // 1️⃣ Only attempt decryption if AES key and IV exist
+    if (!req.body?.encrypted_aes_key || !req.body?.initial_vector) {
+      throw new FlowEndpointException(421, "Missing encryption fields for flow data");
+    }
+
+    // 2️⃣ Decrypt request
     const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
     const { trigger, query, selected_result } = decryptedBody;
 
     console.log("🟢 Decrypted request body:", decryptedBody);
 
-    // Step 2: Logic based on trigger
-    if (trigger === "Enable_Search_Field") {
-      isSearchEnabled = true;
-    }
-
-    if (trigger === "Search_Flights" && query) {
-      availableFlightsListTemp = FLIGHT_LIST.filter((f) =>
-        f.title.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-
-    if (trigger === "Flight_Selected" && selected_result) {
-      availableFlightsListTemp = [selected_result];
-      selectedFlightOption = selected_result.title;
-    }
-
-    if (trigger === "Data_Submitted") {
-      console.log("🛫 Booking submitted:", decryptedBody);
-    }
-
-    // Step 3: Prepare response data
-    const responseData = {
-      data: {
-        status: "active",
-        is_search_enabled: isSearchEnabled,
-        available_flights_list: availableFlightsListTemp,
-        selected_flight_option: selectedFlightOption,
-      },
-    };
-
-    // Step 4: Encrypt response before sending
+    // 3️⃣ Your normal flow logic
+    // ...
+    // encrypt response
+    const responseData = { data: { status: "active" } };
     const encryptedPayload = encryptResponse(responseData, aesKeyBuffer, ivBuffer);
 
     return res.json({ encrypted_flow_data: encryptedPayload });
@@ -66,6 +44,7 @@ const flowController = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
 
 
 module.exports = { flowController };
