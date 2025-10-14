@@ -1,4 +1,4 @@
-const { decryptRequest, encryptResponse, FlowEndpointException } = require("../helpers/cryptohelpers");
+const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 
 const FLIGHT_LIST = [
   { id: "AI203", title: "Air India AI-203" },
