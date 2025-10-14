@@ -1,6 +1,5 @@
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 
-
 const FLIGHT_LIST = [
   { id: "AI203", title: "Air India AI-203" },
   { id: "6E512", title: "IndiGo 6E-512" },
@@ -13,34 +12,51 @@ let isSearchEnabled = false;
 
 const flowController = async (req, res) => {
   try {
-    // 0️⃣ Handle WhatsApp health check ping
     if (req.body?.action === "ping") {
       console.log("🟢 Health check ping received");
       return res.json({ data: { status: "active" } });
     }
 
-    // 1️⃣ Only attempt decryption if AES key and IV exist
-    if (!req.body?.encrypted_aes_key || !req.body?.initial_vector) {
+    if (!req.body?.encrypted_aes_key || !req.body?.initial_vector || !req.body?.encrypted_flow_data) {
       throw new FlowEndpointException(421, "Missing encryption fields for flow data");
     }
 
-    // 2️⃣ Decrypt request
     const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
-    console.log("🟢 Decrypted request body:", decryptedBody);
+    console.log("🟢 Decrypted request:", decryptedBody);
 
     const { trigger, query, selected_result } = decryptedBody;
 
-    // 3️⃣ Your normal flow logic (example)
     if (trigger === "Search_Flights" && query) {
-      // ...filter flights
+      const lowerQuery = query.toLowerCase();
+      availableFlightsListTemp = FLIGHT_LIST.filter(f => f.title.toLowerCase().includes(lowerQuery));
+      isSearchEnabled = true;
+      selectedFlightOption = "";
+    } else if (trigger === "Enable_Search_Field") {
+      isSearchEnabled = true;
+    } else if (trigger === "Data_Submitted") {
+      selectedFlightOption = decryptedBody.selected_flight_option || "";
+      isSearchEnabled = false;
     }
 
-    const responseData = { data: { status: "active" } };
+    const responseData = {
+      data: {
+        Flying_from_data: [
+          { id: "JNB", title: "Johannesburg International" },
+          { id: "CPT", title: "Cape Town International" },
+        ],
+        Flying_to_data: [
+          { id: "JNB", title: "Johannesburg International" },
+          { id: "CPT", title: "Cape Town International" },
+        ],
+        min_date: "2025-07-07",
+        Available_flights_list_temp,
+        selected_flight_option: selectedFlightOption,
+        is_search_enabled: isSearchEnabled,
+        filtered_flights: availableFlightsListTemp,
+      },
+    };
 
-    // 4️⃣ Encrypt response using correct flipped IV
     const encryptedPayload = encryptResponse(responseData, aesKeyBuffer, ivBuffer);
-
-    // 5️⃣ Return final encrypted response
     return res.json({ encrypted_flow_data: encryptedPayload });
   } catch (err) {
     console.error("❌ flowController error:", err);
@@ -50,8 +66,5 @@ const flowController = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
-
-
 
 module.exports = { flowController };

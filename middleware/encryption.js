@@ -1,13 +1,27 @@
-
 const crypto = require("crypto");
 
-const decryptRequest = (body, privatePem, passphrase) => {
+class FlowEndpointException extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+  }
+}
+
+const decryptRequest = (body) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-  const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
-  let decryptedAesKey = null;
+  if (!process.env.PRIVATE_KEY || !process.env.PRIVATE_KEY_PASSPHRASE) {
+    throw new FlowEndpointException(500, "Private key not found in environment");
+  }
+
+  const privateKey = crypto.createPrivateKey({
+    key: process.env.PRIVATE_KEY.replace(/\\n/g, "\n"),
+    passphrase: process.env.PRIVATE_KEY_PASSPHRASE,
+  });
+
+  let decryptedAesKey;
   try {
-    // decrypt AES key created by client
     decryptedAesKey = crypto.privateDecrypt(
       {
         key: privateKey,
@@ -16,80 +30,46 @@ const decryptRequest = (body, privatePem, passphrase) => {
       },
       Buffer.from(encrypted_aes_key, "base64")
     );
-  } catch (error) {
-    console.error(error);
-    /*
-    Failed to decrypt. Please verify your private key.
-    If you change your public key. You need to return HTTP status code 421 to refresh the public key on the client
-    */
+  } catch (err) {
+    console.error(err);
     throw new FlowEndpointException(
       421,
-      "Failed to decrypt the request. Please verify your private key."
+      "Failed to decrypt AES key. Verify private key."
     );
   }
 
-  // decrypt flow data
+  const ivBuffer = Buffer.from(initial_vector, "base64");
   const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
-  const initialVectorBuffer = Buffer.from(initial_vector, "base64");
 
   const TAG_LENGTH = 16;
-  const encrypted_flow_data_body = flowDataBuffer.subarray(0, -TAG_LENGTH);
-  const encrypted_flow_data_tag = flowDataBuffer.subarray(-TAG_LENGTH);
+  const encryptedFlowBody = flowDataBuffer.subarray(0, -TAG_LENGTH);
+  const authTag = flowDataBuffer.subarray(-TAG_LENGTH);
 
-  const decipher = crypto.createDecipheriv(
-    "aes-128-gcm",
-    decryptedAesKey,
-    initialVectorBuffer
-  );
-  decipher.setAuthTag(encrypted_flow_data_tag);
+  const decipher = crypto.createDecipheriv("aes-128-gcm", decryptedAesKey, ivBuffer);
+  decipher.setAuthTag(authTag);
 
-  const decryptedJSONString = Buffer.concat([
-    decipher.update(encrypted_flow_data_body),
-    decipher.final(),
-  ]).toString("utf-8");
+  const decryptedJSON = Buffer.concat([decipher.update(encryptedFlowBody), decipher.final()]).toString("utf-8");
 
   return {
-    decryptedBody: JSON.parse(decryptedJSONString),
+    decryptedBody: JSON.parse(decryptedJSON),
     aesKeyBuffer: decryptedAesKey,
-    initialVectorBuffer,
+    ivBuffer,
   };
 };
 
-const encryptResponse = (
-  response,
-  aesKeyBuffer,
-  initialVectorBuffer
-) => {
-  // flip initial vector
-  const flipped_iv = [];
-  for (const pair of initialVectorBuffer.entries()) {
-    flipped_iv.push(~pair[1]);
-  }
+const encryptResponse = (response, aesKeyBuffer, ivBuffer) => {
+  // Flip IV
+  const flippedIV = Buffer.from(ivBuffer.map(byte => ~byte));
 
-  // encrypt response data
-  const cipher = crypto.createCipheriv(
-    "aes-128-gcm",
-    aesKeyBuffer,
-    Buffer.from(flipped_iv)
-  );
-  return Buffer.concat([
-    cipher.update(JSON.stringify(response), "utf-8"),
-    cipher.final(),
-    cipher.getAuthTag(),
-  ]).toString("base64");
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIV);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(response), "utf-8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return Buffer.concat([encrypted, authTag]).toString("base64");
 };
 
-const FlowEndpointException = class FlowEndpointException extends Error {
-  constructor (statusCode, message) {
-    super(message)
-
-    this.name = this.constructor.name
-    this.statusCode = statusCode;
-  }
-}
-
 module.exports = {
-    decryptRequest,
-    encryptResponse,
-    FlowEndpointException
-}
+  decryptRequest,
+  encryptResponse,
+  FlowEndpointException,
+};
