@@ -1,31 +1,38 @@
 const crypto = require("crypto");
 
-// Custom Exception
 class FlowEndpointException extends Error {
   constructor(statusCode, message) {
     super(message);
-    this.name = this.constructor.name;
+    this.name = "FlowEndpointException";
     this.statusCode = statusCode;
   }
 }
 
 const decryptRequest = (body) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
+  if (!process.env.PRIVATE_KEY)
+    throw new FlowEndpointException(500, "Private key missing in .env");
 
-  // Get private key from env
-  const privateKeyPem = process.env.PRIVATE_KEY?.replace(/\\n/g, "\n");
-  if (!privateKeyPem) {
-    throw new FlowEndpointException(500, "Private key not found in environment variables");
-  }
+  const privateKeyPem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
 
-  // Create private key
-  const privateKey = crypto.createPrivateKey({
+  const keyOptions = {
     key: privateKeyPem,
     format: "pem",
-    passphrase: process.env.PRIVATE_KEY_PASSPHRASE || undefined,
-  });
+    type: "pkcs8",
+  };
 
-  // Decrypt AES key
+  if (process.env.PRIVATE_KEY_PASSPHRASE) {
+    keyOptions.passphrase = process.env.PRIVATE_KEY_PASSPHRASE;
+  }
+
+  let privateKey;
+  try {
+    privateKey = crypto.createPrivateKey(keyOptions);
+  } catch (err) {
+    console.error("❌ Private key creation failed:", err);
+    throw new FlowEndpointException(500, "Invalid private key or passphrase");
+  }
+
   let decryptedAesKey;
   try {
     decryptedAesKey = crypto.privateDecrypt(
@@ -37,19 +44,22 @@ const decryptRequest = (body) => {
       Buffer.from(encrypted_aes_key, "base64")
     );
   } catch (error) {
-    console.error("❌ AES key decryption failed:", error.message);
-    throw new FlowEndpointException(421, "Failed to decrypt the request. Please verify your private key.");
+    console.error("❌ AES key decryption failed:", error);
+    throw new FlowEndpointException(421, "Failed to decrypt AES key");
   }
 
-  // Decrypt flow data
   const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
-  const initialVectorBuffer = Buffer.from(initial_vector, "base64");
+  const ivBuffer = Buffer.from(initial_vector, "base64");
 
   const TAG_LENGTH = 16;
   const encryptedBody = flowDataBuffer.subarray(0, -TAG_LENGTH);
   const authTag = flowDataBuffer.subarray(-TAG_LENGTH);
 
-  const decipher = crypto.createDecipheriv("aes-128-gcm", decryptedAesKey, initialVectorBuffer);
+  const decipher = crypto.createDecipheriv(
+    "aes-128-gcm",
+    decryptedAesKey,
+    ivBuffer
+  );
   decipher.setAuthTag(authTag);
 
   const decryptedJSONString = Buffer.concat([
@@ -60,14 +70,14 @@ const decryptRequest = (body) => {
   return {
     decryptedBody: JSON.parse(decryptedJSONString),
     aesKeyBuffer: decryptedAesKey,
-    initialVectorBuffer,
+    ivBuffer,
   };
 };
 
-const encryptResponse = (response, aesKeyBuffer, initialVectorBuffer) => {
-  const flippedIv = Buffer.from(initialVectorBuffer.map((byte) => ~byte));
-  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
+const encryptResponse = (response, aesKeyBuffer, ivBuffer) => {
+  const flippedIv = Buffer.from(ivBuffer.map((byte) => ~byte));
 
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
   const encryptedBuffer = Buffer.concat([
     cipher.update(JSON.stringify(response), "utf-8"),
     cipher.final(),
