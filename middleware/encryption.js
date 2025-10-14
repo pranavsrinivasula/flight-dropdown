@@ -1,22 +1,40 @@
-
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-const decryptRequest = (body, privatePem, passphrase) => {
+// Custom Exception for Flow Endpoint Errors
+class FlowEndpointException extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.name = this.constructor.name;
+    this.statusCode = statusCode;
+  }
+}
+
+// Decrypt incoming request
+const decryptRequest = (body) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-const privateKeyPem = fs.readFileSync(path.join(__dirname, "private_key.pem"), "utf-8");
+  // Updated path to your private key in 'keys' folder
+  const privateKeyPath = path.join(__dirname, "keys", "private_key.pem");
+  if (!fs.existsSync(privateKeyPath)) {
+    throw new FlowEndpointException(
+      500,
+      `Private key not found at path: ${privateKeyPath}`
+    );
+  }
 
-const privateKey = crypto.createPrivateKey({
-  key: privateKeyPem,
-  format: "pem",
-  passphrase: process.env.PRIVATE_KEY_PASSPHRASE
-});
+  const privateKeyPem = fs.readFileSync(privateKeyPath, "utf-8");
 
-let decryptedAesKey = null;
+  const privateKey = crypto.createPrivateKey({
+    key: privateKeyPem,
+    format: "pem",
+    passphrase: process.env.PRIVATE_KEY_PASSPHRASE, // make sure this env var is set
+  });
+
+  let decryptedAesKey;
   try {
-    // decrypt AES key created by client
+    // decrypt AES key sent by client
     decryptedAesKey = crypto.privateDecrypt(
       {
         key: privateKey,
@@ -26,35 +44,30 @@ let decryptedAesKey = null;
       Buffer.from(encrypted_aes_key, "base64")
     );
   } catch (error) {
-    console.error(error);
-    console.log(privateKey);
-    /*
-    Failed to decrypt. Please verify your private key.
-    If you change your public key. You need to return HTTP status code 421 to refresh the public key on the client
-    */
+    console.error("AES key decryption failed:", error);
     throw new FlowEndpointException(
       421,
       "Failed to decrypt the request. Please verify your private key."
     );
   }
 
-  // decrypt flow data
+  // decrypt flow data using AES key
   const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
   const initialVectorBuffer = Buffer.from(initial_vector, "base64");
 
   const TAG_LENGTH = 16;
-  const encrypted_flow_data_body = flowDataBuffer.subarray(0, -TAG_LENGTH);
-  const encrypted_flow_data_tag = flowDataBuffer.subarray(-TAG_LENGTH);
+  const encryptedBody = flowDataBuffer.subarray(0, -TAG_LENGTH);
+  const authTag = flowDataBuffer.subarray(-TAG_LENGTH);
 
   const decipher = crypto.createDecipheriv(
     "aes-128-gcm",
     decryptedAesKey,
     initialVectorBuffer
   );
-  decipher.setAuthTag(encrypted_flow_data_tag);
+  decipher.setAuthTag(authTag);
 
   const decryptedJSONString = Buffer.concat([
-    decipher.update(encrypted_flow_data_body),
+    decipher.update(encryptedBody),
     decipher.final(),
   ]).toString("utf-8");
 
@@ -65,41 +78,23 @@ let decryptedAesKey = null;
   };
 };
 
-const encryptResponse = (
-  response,
-  aesKeyBuffer,
-  initialVectorBuffer
-) => {
-  // flip initial vector
-  const flipped_iv = [];
-  for (const pair of initialVectorBuffer.entries()) {
-    flipped_iv.push(~pair[1]);
-  }
+// Encrypt response data
+const encryptResponse = (response, aesKeyBuffer, initialVectorBuffer) => {
+  // flip initial vector bytes
+  const flippedIv = Buffer.from(initialVectorBuffer.map(byte => ~byte));
 
-  // encrypt response data
-  const cipher = crypto.createCipheriv(
-    "aes-128-gcm",
-    aesKeyBuffer,
-    Buffer.from(flipped_iv)
-  );
-  return Buffer.concat([
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
+  const encryptedBuffer = Buffer.concat([
     cipher.update(JSON.stringify(response), "utf-8"),
     cipher.final(),
     cipher.getAuthTag(),
-  ]).toString("base64");
+  ]);
+
+  return encryptedBuffer.toString("base64");
 };
 
-const FlowEndpointException = class FlowEndpointException extends Error {
-  constructor (statusCode, message) {
-    super(message)
-
-    this.name = this.constructor.name
-    this.statusCode = statusCode;
-  }
-}
-
 module.exports = {
-    decryptRequest,
-    encryptResponse,
-    FlowEndpointException
-}
+  decryptRequest,
+  encryptResponse,
+  FlowEndpointException,
+};
