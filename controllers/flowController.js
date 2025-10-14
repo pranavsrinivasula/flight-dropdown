@@ -25,16 +25,21 @@ const flowController = async (req, res) => {
 
     // 2️⃣ Decrypt request
     const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
-    const { trigger, query, selected_result } = decryptedBody;
-
     console.log("🟢 Decrypted request body:", decryptedBody);
 
-    // 3️⃣ Your normal flow logic
-    // ...
-    // encrypt response
+    const { trigger, query, selected_result } = decryptedBody;
+
+    // 3️⃣ Your normal flow logic (example)
+    if (trigger === "Search_Flights" && query) {
+      // ...filter flights
+    }
+
     const responseData = { data: { status: "active" } };
+
+    // 4️⃣ Encrypt response using correct flipped IV
     const encryptedPayload = encryptResponse(responseData, aesKeyBuffer, ivBuffer);
 
+    // 5️⃣ Return final encrypted response
     return res.json({ encrypted_flow_data: encryptedPayload });
   } catch (err) {
     console.error("❌ flowController error:", err);
@@ -44,6 +49,7 @@ const flowController = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
 
 
 
