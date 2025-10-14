@@ -6,7 +6,7 @@ const path = require("path");
 const decryptRequest = (body, privatePem, passphrase) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-const privateKeyPem = fs.readFileSync(path.join(__dirname, "../private_key.pem"), "utf-8");
+const privateKeyPem = fs.readFileSync(path.join(__dirname, "private_key.pem"), "utf-8");
 
 const privateKey = crypto.createPrivateKey({
   key: privateKeyPem,
