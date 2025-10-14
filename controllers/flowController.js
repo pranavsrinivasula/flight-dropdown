@@ -4,6 +4,7 @@ const { isRequestSignatureValid } = require("../middleware/valid");
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
 
+// Full flight list
 const FLIGHT_LIST = [
   { id: "AI203", title: "Air India AI-203", from: "DEL", to: "JNB" },
   { id: "6E512", title: "IndiGo 6E-512", from: "DEL", to: "CPT" },
@@ -14,6 +15,7 @@ const FLIGHT_LIST = [
 
 let availableFlightsListTemp = [];
 let selectedFlightOption = "";
+let isSearchEnabled = false;
 
 const flowController = async (req, res) => {
   try {
@@ -44,63 +46,70 @@ const flowController = async (req, res) => {
 
 const getNextScreen = async (currentScreenId, inputData = {}, trigger) => {
   try {
-
     if (currentScreenId === "SEARCH") {
 
-      if (trigger === "FETCH_FLIGHTS") {
+      // --- OptIn: Enable Search Fields ---
+      if (trigger === "Enable_Search_Field") {
+        isSearchEnabled = true;
         return {
           screen: "SEARCH",
           data: {
-            Available_flights_list_temp: FLIGHT_LIST,
-            selected_flight_option: selectedFlightOption
+            Available_flights_list_temp,
+            selected_flight_option: selectedFlightOption,
+            is_search_enabled: isSearchEnabled
           }
         };
       }
 
-      if (trigger === "Search_Flights" && inputData.query) {
-        const query = inputData.query.toLowerCase();
-        const filteredFlights = FLIGHT_LIST.filter(f =>
-          f.title.toLowerCase().includes(query)
-        );
+      // --- Booking Submitted ---
+      if (trigger === "Data_Submitted") {
+        console.log("Booking Data Received:", inputData);
+
+        // Reset after booking
+        availableFlightsListTemp = [];
+        selectedFlightOption = "";
+        isSearchEnabled = false;
+
         return {
-          screen: "FINISH",
+          screen: "SEARCH",
           data: {
-            filtered_flights: filteredFlights
+            Available_flights_list_temp,
+            selected_flight_option: selectedFlightOption,
+            is_search_enabled: isSearchEnabled,
+            status: "Booking Confirmed",
+            message: "Flight successfully booked!"
           }
         };
       }
 
-      if (trigger === "Flight_Selected" && inputData.selected_result) {
-        availableFlightsListTemp = [inputData.selected_result];
-        selectedFlightOption = inputData.selected_result.title;
-
+      // --- Fetch available flights dynamically based on Flying_from and Flying_to ---
+      if (trigger === "FETCH_FLIGHTS" || (inputData.Flying_from && inputData.Flying_to)) {
+        const filteredFlights = FLIGHT_LIST.filter(f =>
+          f.from === inputData.Flying_from && f.to === inputData.Flying_to
+        );
+        availableFlightsListTemp = filteredFlights;
         return {
           screen: "SEARCH",
           data: {
             Available_flights_list_temp: availableFlightsListTemp,
-            selected_flight_option: selectedFlightOption
+            selected_flight_option: selectedFlightOption,
+            is_search_enabled: isSearchEnabled
           }
         };
       }
 
+      // Default return for SEARCH screen
       return {
         screen: "SEARCH",
         data: {
-          Available_flights_list_temp: [],
-          selected_flight_option: ""
+          Available_flights_list_temp,
+          selected_flight_option: selectedFlightOption,
+          is_search_enabled: isSearchEnabled
         }
       };
     }
 
-    if (currentScreenId === "FINISH") {
-      return {
-        screen: "FINISH",
-        data: {
-          filtered_flights: FLIGHT_LIST
-        }
-      };
-    }
-
+    // Default fallback
     return { data: { status: "active" } };
 
   } catch (error) {
