@@ -1,8 +1,6 @@
 const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
 
-// Custom Exception for Flow Endpoint Errors
+// Custom Exception
 class FlowEndpointException extends Error {
   constructor(statusCode, message) {
     super(message);
@@ -11,30 +9,23 @@ class FlowEndpointException extends Error {
   }
 }
 
-// Decrypt incoming request
 const decryptRequest = (body) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-  // Updated path to your private key in 'keys' folder
-  const privateKeyPath = path.join(__dirname, "keys", "private_key.pem");
-  if (!fs.existsSync(privateKeyPath)) {
-    throw new FlowEndpointException(
-      500,
-      `Private key not found at path: ${privateKeyPath}`
-    );
+  // Use private key from environment variable
+  const privateKeyPem = process.env.PRIVATE_KEY;
+  if (!privateKeyPem) {
+    throw new FlowEndpointException(500, "Private key not found in environment variables");
   }
-
-  const privateKeyPem = fs.readFileSync(privateKeyPath, "utf-8");
 
   const privateKey = crypto.createPrivateKey({
     key: privateKeyPem,
     format: "pem",
-    passphrase: process.env.PRIVATE_KEY_PASSPHRASE, // make sure this env var is set
+    passphrase: process.env.PRIVATE_KEY_PASSPHRASE, // optional if key is encrypted
   });
 
   let decryptedAesKey;
   try {
-    // decrypt AES key sent by client
     decryptedAesKey = crypto.privateDecrypt(
       {
         key: privateKey,
@@ -45,13 +36,9 @@ const decryptRequest = (body) => {
     );
   } catch (error) {
     console.error("AES key decryption failed:", error);
-    throw new FlowEndpointException(
-      421,
-      "Failed to decrypt the request. Please verify your private key."
-    );
+    throw new FlowEndpointException(421, "Failed to decrypt the request. Please verify your private key.");
   }
 
-  // decrypt flow data using AES key
   const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
   const initialVectorBuffer = Buffer.from(initial_vector, "base64");
 
@@ -78,9 +65,7 @@ const decryptRequest = (body) => {
   };
 };
 
-// Encrypt response data
 const encryptResponse = (response, aesKeyBuffer, initialVectorBuffer) => {
-  // flip initial vector bytes
   const flippedIv = Buffer.from(initialVectorBuffer.map(byte => ~byte));
 
   const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
