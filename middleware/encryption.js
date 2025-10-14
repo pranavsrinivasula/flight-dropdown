@@ -4,8 +4,13 @@ const crypto = require("crypto");
 const decryptRequest = (body, privatePem, passphrase) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-  const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
-  let decryptedAesKey = null;
+const privateKeyPem = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
+
+const privateKey = crypto.createPrivateKey({
+  key: privateKeyPem,
+  format: 'pem',
+  passphrase: process.env.PRIVATE_KEY_PASSPHRASE
+});  let decryptedAesKey = null;
   try {
     // decrypt AES key created by client
     decryptedAesKey = crypto.privateDecrypt(
