@@ -1,16 +1,7 @@
-const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
-const { isRequestSignatureValid } = require("../middleware/valid");
-
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const PASSPHRASE = process.env.PASSPHRASE;
-
-// Full flight list
 const FLIGHT_LIST = [
-  { id: "AI203", title: "Air India AI-203", from: "DEL", to: "JNB" },
-  { id: "6E512", title: "IndiGo 6E-512", from: "DEL", to: "CPT" },
-  { id: "UK811", title: "Vistara UK-811", from: "BOM", to: "JNB" },
-  { id: "EK501", title: "Emirates EK-501", from: "DEL", to: "CPT" },
-  { id: "BA142", title: "British Airways BA-142", from: "BOM", to: "JNB" }
+  { id: "AI203", title: "Air India AI-203" },
+  { id: "6E512", title: "IndiGo 6E-512" },
+  { id: "UK811", title: "Vistara UK-811" }
 ];
 
 let availableFlightsListTemp = [];
@@ -19,103 +10,47 @@ let isSearchEnabled = false;
 
 const flowController = async (req, res) => {
   try {
-    if (!PRIVATE_KEY) throw new Error("Private key is empty");
-    if (!isRequestSignatureValid(req)) return res.status(432).send();
+    const { trigger, query, status, selected_result } = req.body;
 
-    let decryptedRequest;
-    try {
-      decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
-    } catch (err) {
-      console.error("❌ Decryption failed:", err);
-      if (err instanceof FlowEndpointException) return res.status(err.statusCode).send();
-      return res.status(500).send();
+    // Enable search fields
+    if (trigger === "Enable_Search_Field") {
+      isSearchEnabled = true;
+      return res.json({ data: { is_search_enabled: true } });
     }
 
-    const { aesKeyBuffer, initialVectorBuffer, decryptedBody } = decryptedRequest;
-    const { screen, data, trigger } = decryptedBody;
+    // Submit booking
+    if (trigger === "Data_Submitted") {
+      console.log("Booking Data Received:", req.body);
+      return res.json({ data: { status: "Booking Confirmed", message: "Flight successfully booked!" } });
+    }
 
-    const responsePayload = await getNextScreen(screen, data || {}, trigger);
-    const encrypted = encryptResponse(responsePayload, aesKeyBuffer, initialVectorBuffer);
-    return res.send(encrypted);
+    // Flight search
+    if (trigger === "Search_Flights") {
+      const filteredFlights = FLIGHT_LIST.filter(f =>
+        f.title.toLowerCase().includes((query || "").toLowerCase())
+      );
+      return res.json({ data: { filtered_flights: filteredFlights } });
+    }
+
+    // Flight selected
+    if (trigger === "Flight_Selected" && selected_result) {
+      availableFlightsListTemp = [selected_result];
+      selectedFlightOption = selected_result.title;
+      return res.json({
+        data: {
+          Available_flights_list_temp: availableFlightsListTemp,
+          selected_flight_option: selectedFlightOption
+        }
+      });
+    }
+
+    // Default response
+    return res.json({ data: { status: "active", is_search_enabled: isSearchEnabled } });
 
   } catch (err) {
     console.error("❌ flowController error:", err);
-    return res.status(500).send();
+    return res.status(500).json({ error: err.message });
   }
 };
 
-const getNextScreen = async (currentScreenId, inputData = {}, trigger) => {
-  try {
-    if (currentScreenId === "SEARCH") {
-
-      // --- OptIn: Enable Search Fields ---
-      if (trigger === "Enable_Search_Field") {
-        isSearchEnabled = true;
-        return {
-          screen: "SEARCH",
-          data: {
-            Available_flights_list_temp,
-            selected_flight_option: selectedFlightOption,
-            is_search_enabled: isSearchEnabled
-          }
-        };
-      }
-
-      // --- Booking Submitted ---
-      if (trigger === "Data_Submitted") {
-        console.log("Booking Data Received:", inputData);
-
-        // Reset after booking
-        availableFlightsListTemp = [];
-        selectedFlightOption = "";
-        isSearchEnabled = false;
-
-        return {
-          screen: "SEARCH",
-          data: {
-            Available_flights_list_temp,
-            selected_flight_option: selectedFlightOption,
-            is_search_enabled: isSearchEnabled,
-            status: "Booking Confirmed",
-            message: "Flight successfully booked!"
-          }
-        };
-      }
-
-      // --- Fetch available flights dynamically based on Flying_from and Flying_to ---
-      if (trigger === "FETCH_FLIGHTS" || (inputData.Flying_from && inputData.Flying_to)) {
-        const filteredFlights = FLIGHT_LIST.filter(f =>
-          f.from === inputData.Flying_from && f.to === inputData.Flying_to
-        );
-        availableFlightsListTemp = filteredFlights;
-        return {
-          screen: "SEARCH",
-          data: {
-            Available_flights_list_temp: availableFlightsListTemp,
-            selected_flight_option: selectedFlightOption,
-            is_search_enabled: isSearchEnabled
-          }
-        };
-      }
-
-      // Default return for SEARCH screen
-      return {
-        screen: "SEARCH",
-        data: {
-          Available_flights_list_temp,
-          selected_flight_option: selectedFlightOption,
-          is_search_enabled: isSearchEnabled
-        }
-      };
-    }
-
-    // Default fallback
-    return { data: { status: "active" } };
-
-  } catch (error) {
-    console.error("❌ Error in getNextScreen:", error);
-    throw new FlowEndpointException("Error processing next screen", error);
-  }
-};
-
-module.exports = { flowController, getNextScreen };
+module.exports = { flowController };
