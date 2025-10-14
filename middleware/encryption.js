@@ -21,7 +21,7 @@ const decryptRequest = (body) => {
   const privateKey = crypto.createPrivateKey({
     key: privateKeyPem,
     format: "pem",
-    passphrase: process.env.PASSPHRASE, // optional if key is encrypted
+    passphrase: process.env.PRIVATE_KEY_PASSPHRASE, // optional if key is encrypted
   });
 
   let decryptedAesKey;
