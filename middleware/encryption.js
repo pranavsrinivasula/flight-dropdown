@@ -75,9 +75,7 @@ const decryptRequest = (body) => {
 };
 
 const encryptResponse = (response, aesKeyBuffer, ivBuffer) => {
-  const flippedIv = Buffer.from(ivBuffer.map((byte) => ~byte));
-
-  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, ivBuffer);
   const encryptedBuffer = Buffer.concat([
     cipher.update(JSON.stringify(response), "utf-8"),
     cipher.final(),
@@ -86,5 +84,6 @@ const encryptResponse = (response, aesKeyBuffer, ivBuffer) => {
 
   return encryptedBuffer.toString("base64");
 };
+
 
 module.exports = { decryptRequest, encryptResponse, FlowEndpointException };
