@@ -4,8 +4,7 @@ const crypto = require("crypto");
 const decryptRequest = (body, privatePem, passphrase) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
-const privateKeyPem = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
-
+const privateKeyPem = process.env.PRIVATE_KEY_PATH
 const privateKey = crypto.createPrivateKey({
   key: privateKeyPem,
   format: 'pem',
@@ -23,6 +22,7 @@ const privateKey = crypto.createPrivateKey({
     );
   } catch (error) {
     console.error(error);
+    console.log(privateKey);
     /*
     Failed to decrypt. Please verify your private key.
     If you change your public key. You need to return HTTP status code 421 to refresh the public key on the client
