@@ -1,70 +1,73 @@
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 
-const FLIGHT_LIST = [
-  { id: "AI203", title: "Air India AI-203" },
-  { id: "6E512", title: "IndiGo 6E-512" },
-  { id: "UK811", title: "Vistara UK-811" },
-];
-
-let availableFlightsListTemp = [];
-let selectedFlightOption = "";
-let isSearchEnabled = false;
-
-const flowController = async (req, res) => {
+const flightFlowController = async (req, res) => {
   try {
-    if (req.body?.action === "ping") {
-      console.log("🟢 Health check ping received");
-      return res.json({ data: { status: "active" } });
-    }
-
-    if (!req.body?.encrypted_aes_key || !req.body?.initial_vector || !req.body?.encrypted_flow_data) {
-      throw new FlowEndpointException(421, "Missing encryption fields for flow data");
-    }
-
+    // STEP 1: Decrypt incoming payload
     const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
-    console.log("🟢 Decrypted request:", decryptedBody);
 
-    const { trigger, query, selected_result } = decryptedBody;
+    console.log("Decrypted flow data:", decryptedBody);
 
-    if (trigger === "Search_Flights" && query) {
-      const lowerQuery = query.toLowerCase();
-      availableFlightsListTemp = FLIGHT_LIST.filter(f => f.title.toLowerCase().includes(lowerQuery));
-      isSearchEnabled = true;
-      selectedFlightOption = "";
-    } else if (trigger === "Enable_Search_Field") {
-      isSearchEnabled = true;
-    } else if (trigger === "Data_Submitted") {
-      selectedFlightOption = decryptedBody.selected_flight_option || "";
-      isSearchEnabled = false;
-    }
+    const userSelection = decryptedBody?.data?.selected_flight_option || null;
 
-    const responseData = {
+    // STEP 2: Base response data
+    let responsePayload = {
+      version: "7.1",
       data: {
-        Flying_from_data: [
-          { id: "JNB", title: "Johannesburg International" },
-          { id: "CPT", title: "Cape Town International" },
+        show_search_input: false,
+        show_search_link: false,
+        message: "Please select a flight to enable search",
+      },
+      layout: {
+        type: "SingleColumnLayout",
+        children: [
+          { type: "TextSubheading", text: "🛫 Book Your Flight" },
+          { type: "TextCaption", text: "Choose where you want to fly from to begin your booking:" },
+          { type: "Dropdown", label: "Select a Flight", name: "selected_flight_option", required: true },
         ],
-        Flying_to_data: [
-          { id: "JNB", title: "Johannesburg International" },
-          { id: "CPT", title: "Cape Town International" },
-        ],
-        min_date: "2025-07-07",
-        Available_flights_list_temp,
-        selected_flight_option: selectedFlightOption,
-        is_search_enabled: isSearchEnabled,
-        filtered_flights: availableFlightsListTemp,
       },
     };
 
-    const encryptedPayload = encryptResponse(responseData, aesKeyBuffer, ivBuffer);
-    return res.json({ encrypted_flow_data: encryptedPayload });
+    // STEP 3: If user selected a valid flight, enable input + search link
+    if (userSelection && userSelection.trim() !== "") {
+      responsePayload = {
+        version: "7.1",
+        data: {
+          show_search_input: true,
+          show_search_link: true,
+          message: `You selected: ${userSelection}. Search enabled.`,
+        },
+        layout: {
+          type: "SingleColumnLayout",
+          children: [
+            { type: "TextSubheading", text: "🛫 Book Your Flight" },
+            { type: "TextCaption", text: "You can now search for available flights below:" },
+            { type: "TextInput", label: "Enter Flight Name", name: "search_query", "input-type": "text" },
+            {
+              type: "EmbeddedLink",
+              text: "🔎 Go to Search & Select Flight",
+              on_click_action: {
+                name: "navigate",
+                next: { type: "screen", name: "FINISH" },
+              },
+            },
+          ],
+        },
+      };
+    }
+
+    // STEP 4: Encrypt response
+    const encryptedResponse = encryptResponse(responsePayload, aesKeyBuffer, ivBuffer);
+
+    // STEP 5: Send encrypted response
+    return res.status(200).json({ encrypted_response: encryptedResponse });
+
   } catch (err) {
     console.error("❌ flowController error:", err);
-    if (err instanceof FlowEndpointException) {
-      return res.status(err.statusCode).json({ error: err.message });
-    }
-    return res.status(500).json({ error: err.message });
+    const status = err.statusCode || 500;
+    return res.status(status).json({
+      error: err.message || "Internal Server Error",
+    });
   }
 };
 
-module.exports = { flowController };
+module.exports = { flightFlowController };

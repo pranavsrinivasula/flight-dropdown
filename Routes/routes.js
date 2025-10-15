@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { flowController } = require("../controllers/flowController");
+const { flightFlowController } = require("../controllers/flowController");
 
-// POST /webhook
-router.post("/webhook", flowController);
+// POST /api/flow/booking or /webhook (depending on your endpoint)
+router.post("/webhook", flightFlowController);
 
-// Export the router correctly
-module.exports = { flowRouter: router };
+// ✅ Export router directly
+module.exports = router;
