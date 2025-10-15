@@ -29,9 +29,12 @@ const decryptRequest = (body) => {
         oaepHash: "sha256",
       },
       Buffer.from(encrypted_aes_key, "base64")
+      
     );
   } catch (err) {
     console.error(err);
+    console.log("AES Key Length:", decryptedAesKey.length);
+
     throw new FlowEndpointException(
       421,
       "Failed to decrypt AES key. Verify private key."
@@ -58,11 +61,14 @@ const decryptRequest = (body) => {
 };
 
 const encryptResponse = (response, aesKeyBuffer, ivBuffer) => {
-  // Flip IV
-  const flippedIV = Buffer.from(ivBuffer.map(byte => ~byte));
+  // Flip IV correctly (bitwise NOT & stay in byte range)
+  const flippedIV = Buffer.from(ivBuffer.map(byte => (~byte) & 0xff));
 
   const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIV);
-  const encrypted = Buffer.concat([cipher.update(JSON.stringify(response), "utf-8"), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(response), "utf-8"),
+    cipher.final(),
+  ]);
   const authTag = cipher.getAuthTag();
 
   return Buffer.concat([encrypted, authTag]).toString("base64");
