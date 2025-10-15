@@ -8,6 +8,9 @@ class FlowEndpointException extends Error {
   }
 }
 
+/**
+ * Decrypt WhatsApp Flow Request
+ */
 const decryptRequest = (body) => {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
 
@@ -15,11 +18,13 @@ const decryptRequest = (body) => {
     throw new FlowEndpointException(500, "Private key not found in environment");
   }
 
+  // Load RSA private key
   const privateKey = crypto.createPrivateKey({
     key: process.env.PRIVATE_KEY.replace(/\\n/g, "\n"),
     passphrase: process.env.PRIVATE_KEY_PASSPHRASE,
   });
 
+  // Decrypt AES key
   let decryptedAesKey;
   try {
     decryptedAesKey = crypto.privateDecrypt(
@@ -29,49 +34,49 @@ const decryptRequest = (body) => {
         oaepHash: "sha256",
       },
       Buffer.from(encrypted_aes_key, "base64")
-      
     );
   } catch (err) {
     console.error(err);
-    console.log("AES Key Length:", decryptedAesKey.length);
-
-    throw new FlowEndpointException(
-      421,
-      "Failed to decrypt AES key. Verify private key."
-    );
+    throw new FlowEndpointException(421, "Failed to decrypt AES key.");
   }
 
   const ivBuffer = Buffer.from(initial_vector, "base64");
-  const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
+  const encryptedBuffer = Buffer.from(encrypted_flow_data, "base64");
 
-  const TAG_LENGTH = 16;
-  const encryptedFlowBody = flowDataBuffer.subarray(0, -TAG_LENGTH);
-  const authTag = flowDataBuffer.subarray(-TAG_LENGTH);
+  // Split ciphertext and authTag (GCM tag is always last 16 bytes)
+  const tagLength = 16;
+  const ciphertext = encryptedBuffer.subarray(0, -tagLength);
+  const authTag = encryptedBuffer.subarray(-tagLength);
 
   const decipher = crypto.createDecipheriv("aes-128-gcm", decryptedAesKey, ivBuffer);
   decipher.setAuthTag(authTag);
 
-  const decryptedJSON = Buffer.concat([decipher.update(encryptedFlowBody), decipher.final()]).toString("utf-8");
+  const decryptedJSON = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf-8");
 
-  return {
-    decryptedBody: JSON.parse(decryptedJSON),
-    aesKeyBuffer: decryptedAesKey,
-    ivBuffer,
-  };
+  const decryptedBody = JSON.parse(decryptedJSON);
+
+  return { decryptedBody, aesKeyBuffer: decryptedAesKey, ivBuffer };
 };
 
+/**
+ * Encrypt WhatsApp Flow Response
+ */
 const encryptResponse = (response, aesKeyBuffer, ivBuffer) => {
-  // Flip IV correctly (bitwise NOT & stay in byte range)
+  // Correct IV flip: unsigned bitwise NOT
   const flippedIV = Buffer.from(ivBuffer.map(byte => (~byte) & 0xff));
 
   const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIV);
-  const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(response), "utf-8"),
+  const ciphertext = Buffer.concat([
+    cipher.update(JSON.stringify(response), "utf8"),
     cipher.final(),
   ]);
   const authTag = cipher.getAuthTag();
 
-  return Buffer.concat([encrypted, authTag]).toString("base64");
+  // Return Base64 encoded (ciphertext + authTag)
+  return Buffer.concat([ciphertext, authTag]).toString("base64");
 };
 
 module.exports = {
