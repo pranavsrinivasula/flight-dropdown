@@ -33,7 +33,7 @@ const decryptRequest = (body) => {
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
         oaepHash: "sha256",
       },
-      Buffer.from(encrypted_aes_key, "base64")
+      Buffer.from(encrypted_aes_key,"base64")
     );
   } catch (err) {
     console.error(err);
@@ -84,3 +84,4 @@ module.exports = {
   encryptResponse,
   FlowEndpointException,
 };
+

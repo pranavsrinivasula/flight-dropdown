@@ -1,9 +1,11 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { flightFlowController } = require("../controllers/flowController");
+const flightChipsController = require('../controllers/flightChipsController');
 
-// POST /api/flow/booking or /webhook (depending on your endpoint)
-router.post("/webhook", flightFlowController);
+// Get current chip states
+router.get('/', flightChipsController.getChips);
 
-// ✅ Export router directly
+// Toggle a chip (select/deselect)
+router.post('/toggle', flightChipsController.toggleChip);
+
 module.exports = router;
