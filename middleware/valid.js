@@ -1,26 +1,40 @@
-const crypto = require("crypto");
+const { decryptRequest, encryptResponse } = require("./cryptohelpers");
+const { FlowEndpointException } = require("./cryptohelpers");
 
-function isRequestSignatureValid(req) {
-    const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "", } = process.env;
-    if (!APP_SECRET) {
-        console.warn("App Secret is not set up. Please Add your app secret in /.env file to check for request validation");
-        return true;
+// Your in-memory storage
+let userFlightSelection = {};
+
+app.post("/api/flightType/:userId", async (req, res) => {
+    try {
+        // Step 1: Decrypt incoming request
+        const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
+        const { selectedId } = decryptedBody;
+
+        // Step 2: Update selection in-memory
+        if (selectedId && ["1", "2"].includes(selectedId)) {
+            userFlightSelection[req.params.userId] = selectedId;
+        }
+        const currentSelection = userFlightSelection[req.params.userId] || null;
+
+        // Step 3: Prepare response
+        const responseObj = {
+            initValue: currentSelection,
+            dataSource: [
+                { id: "1", title: "One-Way", enabled: true },
+                { id: "2", title: "Return", enabled: true }
+            ],
+            maxSelectedItems: 1
+        };
+
+        // Step 4: Encrypt response
+        const encryptedResponse = encryptResponse(responseObj, aesKeyBuffer, ivBuffer);
+
+        res.send(encryptedResponse); // Base64 string
+    } catch (err) {
+        if (err instanceof FlowEndpointException) {
+            return res.status(err.statusCode).json({ message: err.message });
+        }
+        console.error(err);
+        res.status(500).json({ message: "Internal server error" });
     }
-
-    const signatureHeader = req.get("x-hub-signature-256");
-    const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "utf-8");
-
-    const hmac = crypto.createHmac("sha256", APP_SECRET);
-    const digestString = hmac.update(req.rawBody).digest('hex');
-    const digestBuffer = Buffer.from(digestString, "utf-8");
-
-    if (!crypto.timingSafeEqual(digestBuffer, signatureBuffer)) {
-        console.error("Error: Request Signature did not match");
-        return false;
-    }
-    return true;
-}
-
-module.exports = {
-    isRequestSignatureValid
-}
+});
