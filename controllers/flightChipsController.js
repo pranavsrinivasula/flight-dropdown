@@ -4,7 +4,6 @@ let Flight_Type1 = [
 ];
 
 exports.getChips = (req, res) => {
-  // read selectedId from nested object
   const selectedId = req.body.Flight_Type1?.selectedId;
 
   if (!selectedId) {
@@ -19,8 +18,7 @@ exports.getChips = (req, res) => {
     }));
   }
     
- const response = { chips: Flight_Type1 };
-  const base64Response = Buffer.from(JSON.stringify(response)).toString('base64');
+const response = { chips: Flight_Type1 };
+res.json(response);
 
-  res.send(base64Response);
 };
