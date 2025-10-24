@@ -1,4 +1,4 @@
-let Flight_Type1 = [
+let Flight_Type = [
   { id: "1", title: "One-Way", selected: false, enabled: true },
   { id: "2", title: "Return", selected: false, enabled: true }
 ];
@@ -8,7 +8,7 @@ exports.getChips = (req, res) => {
 
   // Update selection if provided
   if (selectedId) {
-    Flight_Type1 = Flight_Type1.map(chip => ({
+    Flight_Type1 = Flight_Type.map(chip => ({
       ...chip,
       selected: chip.id === selectedId,
       enabled: true
@@ -16,5 +16,5 @@ exports.getChips = (req, res) => {
   }
 
   // Return plain JSON — this works for ChipsSelector
-  res.json({ chips: Flight_Type1 });
+  res.json({ chips: Flight_Type });
 };
