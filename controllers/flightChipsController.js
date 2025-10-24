@@ -4,21 +4,17 @@ let Flight_Type1 = [
 ];
 
 exports.getChips = (req, res) => {
-  const selectedId = req.body.Flight_Type1?.selectedId;
+  const selectedId = req.body?.Flight_Type1?.selectedId;
 
-  if (!selectedId) {
-    return res.json({ chips: Flight_Type1 });
-  }
-
- else  {
+  // Update selection if provided
+  if (selectedId) {
     Flight_Type1 = Flight_Type1.map(chip => ({
       ...chip,
       selected: chip.id === selectedId,
       enabled: true
     }));
   }
-    
-const response = { chips: Flight_Type1 };
-res.json(response);
 
+  // Return plain JSON — this works for ChipsSelector
+  res.json({ chips: Flight_Type1 });
 };
