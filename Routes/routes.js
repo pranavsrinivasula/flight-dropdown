@@ -1,11 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const flightChipsController = require('../controllers/flightChipsController');
 
-// Get current chip states
-router.get('/', flightChipsController.getChips);
+const { getChips } = require("../controllers/flightChipsController");
 
-// Toggle a chip (select/deselect)
-router.post('/toggle', flightChipsController.toggleChip);
+router.post('/api/chips', getChips);  // endpoint to get/update chips
 
 module.exports = router;
