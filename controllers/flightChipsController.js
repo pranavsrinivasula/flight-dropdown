@@ -4,7 +4,8 @@ let Flight_Type1 = [
 ];
 
 exports.getChips = (req, res) => {
-  const { selectedId } = req.body;
+  // read selectedId from nested object
+  const selectedId = req.body.Flight_Type1?.selectedId;
 
   if (!selectedId) {
     return res.json({ chips: Flight_Type1 });
