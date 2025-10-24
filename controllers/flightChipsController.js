@@ -11,11 +11,16 @@ exports.getChips = (req, res) => {
     return res.json({ chips: Flight_Type1 });
   }
 
-  Flight_Type1 = Flight_Type1.map(chip => ({
-    ...chip,
-    selected: chip.id === selectedId,
-    enabled: true
-  }));
+ else  {
+    Flight_Type1 = Flight_Type1.map(chip => ({
+      ...chip,
+      selected: chip.id === selectedId,
+      enabled: true
+    }));
+  }
+    
+ const response = { chips: Flight_Type1 };
+  const base64Response = Buffer.from(JSON.stringify(response)).toString('base64');
 
-  res.json({ chips: Flight_Type1 });
+  res.send(base64Response);
 };
