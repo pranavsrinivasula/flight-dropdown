@@ -1,7 +1,6 @@
 // controllers/flightTypeController.js
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 const { isRequestSignatureValid } = require("../middleware/valid");
-const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "" } = process.env;
 
 const CHIP_OPTIONS = [
   { id: "1", title: "One-Way" },
@@ -10,18 +9,18 @@ const CHIP_OPTIONS = [
 
 exports.handleFlightType = async (req, res) => {
   try {
-    // Optional signature check (keep or remove per your flow)
+    // optional signature validation - comment out while debugging if unsure
     if (typeof isRequestSignatureValid === "function" && !isRequestSignatureValid(req)) {
       console.warn("Request signature invalid");
       return res.status(432).send();
     }
 
-    // Path A: Encrypted Meta request (common)
+    // Path A: Encrypted Meta request
     if (req.body && req.body.encrypted_flow_data) {
       let decrypted;
       try {
-        // Use the same signature as your other endpoints (PRIVATE_KEY + PASSPHRASE)
-        decrypted = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+        // Pass env/key explicitly for clarity
+        decrypted = decryptRequest(req.body, process.env.PRIVATE_KEY, process.env.PRIVATE_KEY_PASSPHRASE || process.env.PASSPHRASE);
       } catch (err) {
         console.error("Failed to decrypt request:", err);
         if (err instanceof FlowEndpointException) {
@@ -31,7 +30,7 @@ exports.handleFlightType = async (req, res) => {
       }
 
       const { decryptedBody, aesKeyBuffer, ivBuffer } = decrypted;
-      console.log("Decrypted body:", JSON.stringify(decryptedBody));
+      console.info("Decrypted body:", JSON.stringify(decryptedBody));
 
       const payload = decryptedBody.payload || {};
       const trigger = typeof payload.trigger === "string" ? payload.trigger : null;
@@ -82,8 +81,7 @@ exports.handleFlightType = async (req, res) => {
       return res.status(200).send(enc);
     }
 
-    // Path B: Plain/manual health check (Postman / Render / local)
-    // This is useful for quick tests. Meta will not hit this branch.
+    // Path B: Plain/manual health check (Postman / local)
     return res.status(200).json({
       success: true,
       message: "Plain health check OK (for manual testing).",
