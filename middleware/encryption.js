@@ -125,8 +125,7 @@ function encryptResponse(responseBody, aesKeyBuffer, ivBuffer) {
 
   return output;
 }
-console.log("🔐 Decrypted AES key length:", aesKeyBuffer.length);
-console.log("🔐 IV length:", ivBuffer.length);
+
 
 
 module.exports = {
