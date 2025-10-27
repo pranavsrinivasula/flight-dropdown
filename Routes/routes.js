@@ -1,8 +1,9 @@
-const express = require('express');
+// routes/flightTypeRoutes.js
+const express = require("express");
 const router = express.Router();
-
 const { handleFlightType } = require("../controllers/flightChipsController");
 
-router.post('/api/chips', handleFlightType);  // endpoint to get/update chips
+// POST /api/flight-type
+router.post("/flight-type", handleFlightType);
 
 module.exports = router;
