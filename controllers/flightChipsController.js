@@ -3,35 +3,52 @@ const { decryptRequest, encryptResponse, FlowEndpointException } = require("../m
 const fs = require("fs");
 const path = require("path");
 
-// store user selection in memory (can later move to DB)
 let userFlightSelection = {};
 
 exports.handleFlightType = async (req, res) => {
   try {
-    // Load private key
-    const privatePem = fs.readFileSync(path.join(__dirname, "../keys/private.pem"), "utf8");
+    console.log("🚀 Incoming Request Body:", req.body);
+
+    // 1️⃣ Load private key
+    const privateKeyPath = path.join(__dirname, "../keys/private.pem");
+    console.log("🔑 Looking for private key at:", privateKeyPath);
+
+    if (!fs.existsSync(privateKeyPath)) {
+      console.error("❌ Private key not found at", privateKeyPath);
+      throw new FlowEndpointException(500, "Private key missing on server");
+    }
+
+    const privatePem = fs.readFileSync(privateKeyPath, "utf8");
     const passphrase = process.env.PRIVATE_KEY_PASSPHRASE || "";
 
-    // Step 1: Decrypt incoming request
-    const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body, privatePem, passphrase);
+    // 2️⃣ Try decrypting the request
+    console.log("🧩 Starting decryption...");
+    const decrypted = decryptRequest(req.body, privatePem, passphrase);
+    console.log("✅ Decryption success!");
 
-    console.log("🛫 Decrypted Payload:", decryptedBody);
+    const { decryptedBody, aesKeyBuffer, ivBuffer } = decrypted;
+    console.log("📦 Decrypted body:", decryptedBody);
 
+    // 3️⃣ Extract trigger and user data
     const trigger = decryptedBody?.trigger;
-    const userId = decryptedBody?.user_id || "guest"; // sample unique user
+    const userId = decryptedBody?.user_id || "guest";
     let currentSelection = userFlightSelection[userId] || "";
 
-    // Step 2: If trigger == "chipper", update flight type selection
+    console.log("👤 User:", userId, "Trigger:", trigger);
+
+    // 4️⃣ Update selection
     if (trigger === "chipper") {
       const selected = decryptedBody?.Type_Flight;
+      console.log("✈️ Selected Flight Type:", selected);
       if (selected && ["One-Way", "Return"].includes(selected)) {
         userFlightSelection[userId] = selected;
         currentSelection = selected;
-        console.log(`✅ Updated Flight_Type for ${userId}:`, selected);
+      } else {
+        console.warn("⚠️ Invalid selection received:", selected);
       }
     }
 
-    // Step 3: Prepare Meta-compliant Flow response
+    // 5️⃣ Prepare flow response
     const responseBody = {
       version: "1.0",
       data: {
@@ -66,10 +83,13 @@ exports.handleFlightType = async (req, res) => {
       },
     };
 
-    // Step 4: Encrypt response
-    const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+    console.log("🧠 Response prepared:", JSON.stringify(responseBody, null, 2));
 
-    // Step 5: Send encrypted response
+    // 6️⃣ Encrypt response
+    const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+    console.log("🔐 Encryption success!");
+
+    // 7️⃣ Send encrypted response
     res.status(200).json({
       encrypted_flow_data: encryptedResponse,
     });
@@ -78,7 +98,7 @@ exports.handleFlightType = async (req, res) => {
     if (error instanceof FlowEndpointException) {
       res.status(error.statusCode).json({ success: false, message: error.message });
     } else {
-      res.status(500).json({ success: false, message: "Internal server error" });
+      res.status(500).json({ success: false, message: error.message || "Internal server error" });
     }
   }
 };
