@@ -7,8 +7,7 @@ const app = express();
 
 app.use(bodyParser.json());
 
-app.use(flightTypeRoutes);
-
+app.use("/", flightTypeRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
