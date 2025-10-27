@@ -1,74 +1,85 @@
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
+// Environment variables
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const PASSPHRASE = process.env.PRIVATE_KEY_PASSPHRASE || "";
+
+// Custom error class for flow exceptions
 class FlowEndpointException extends Error {
   constructor(statusCode, message) {
     super(message);
-    this.name = this.constructor.name;
     this.statusCode = statusCode;
   }
 }
 
-const decryptRequest = (body, privatePem, passphrase) => {
-  const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
+/* -------------------------------------------------------------------------- */
+/* 🔐 AES Encryption + Decryption Helpers                                     */
+/* -------------------------------------------------------------------------- */
 
-  const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
-  let decryptedAesKey;
-
-  try {
-    decryptedAesKey = crypto.privateDecrypt(
-      {
-        key: privateKey,
-        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: "sha256",
-      },
-      Buffer.from(encrypted_aes_key, "base64")
-    );
-  } catch (error) {
-    console.error("❌ AES key decryption failed:", error.message);
-    throw new FlowEndpointException(
-      421,
-      "Failed to decrypt AES key. Verify your private key or passphrase."
-    );
+// Decrypt incoming request body from WhatsApp Flow
+function decryptRequest(body, privateKeyPem, passphrase) {
+  if (!body.encrypted_flow_data) {
+    throw new FlowEndpointException(400, "Missing encrypted_flow_data in request body");
   }
 
-  const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
-  const initialVectorBuffer = Buffer.from(initial_vector, "base64");
+  // Convert the base64 encoded envelope into a buffer
+  let envelopeBuffer;
+  try {
+    envelopeBuffer = Buffer.from(body.encrypted_flow_data, "base64");
+  } catch (err) {
+    throw new FlowEndpointException(400, "Response body is not Base64 encoded");
+  }
 
-  const TAG_LENGTH = 16;
-  const ciphertext = flowDataBuffer.subarray(0, -TAG_LENGTH);
-  const authTag = flowDataBuffer.subarray(-TAG_LENGTH);
-
-  const decipher = crypto.createDecipheriv("aes-128-gcm", decryptedAesKey, initialVectorBuffer);
-  decipher.setAuthTag(authTag);
-
-  const decryptedJSONString = Buffer.concat([
-    decipher.update(ciphertext),
-    decipher.final(),
-  ]).toString("utf-8");
-
-  return {
-    decryptedBody: JSON.parse(decryptedJSONString),
-    aesKeyBuffer: decryptedAesKey,
-    initialVectorBuffer,
+  // Extract AES key and IV using private RSA key
+  const privateKey = {
+    key: privateKeyPem,
+    passphrase: passphrase,
   };
-};
 
-const encryptResponse = (response, aesKeyBuffer, initialVectorBuffer) => {
-  // Correct IV flip
-  const flipped_iv = Buffer.from(initialVectorBuffer.map(byte => (~byte) & 0xff));
+  // Decrypt AES key and IV (first 512 bytes = AES key, next 16 bytes = IV)
+  const aesKeyLength = 256; // 256-bit key (32 bytes)
+  const ivLength = 16; // 16 bytes IV
 
-  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flipped_iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(JSON.stringify(response), "utf-8"),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
+  const aesKeyBuffer = envelopeBuffer.subarray(0, aesKeyLength);
+  const initialVectorBuffer = envelopeBuffer.subarray(aesKeyLength, aesKeyLength + ivLength);
+  const encryptedPayload = envelopeBuffer.subarray(aesKeyLength + ivLength);
 
-  return Buffer.concat([ciphertext, authTag]).toString("base64");
-};
+  // Decrypt AES key (if RSA encrypted)
+  // if your flow sends AES key already raw, skip RSA decrypt
 
-module.exports = {
-  decryptRequest,
-  encryptResponse,
-  FlowEndpointException,
-};
+  // Decrypt payload with AES
+  let decrypted;
+  try {
+    const decipher = crypto.createDecipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
+    decrypted = Buffer.concat([decipher.update(encryptedPayload), decipher.final()]);
+  } catch (err) {
+    throw new FlowEndpointException(500, "AES decryption failed");
+  }
+
+  let decryptedBody;
+  try {
+    decryptedBody = JSON.parse(decrypted.toString());
+  } catch (err) {
+    throw new FlowEndpointException(500, "Invalid JSON after decryption");
+  }
+
+  return { aesKeyBuffer, initialVectorBuffer, decryptedBody };
+}
+
+// Encrypt outgoing response for WhatsApp Flow
+function encryptResponse(responseBody, aesKeyBuffer, initialVectorBuffer) {
+  try {
+    const cipher = crypto.createCipheriv("aes-256-cbc", aesKeyBuffer, initialVectorBuffer);
+    const encrypted = Buffer.concat([
+      cipher.update(JSON.stringify(responseBody)),
+      cipher.final(),
+    ]);
+
+    // Return base64 string for the response
+    return encrypted.toString("base64");
+  } catch (err) {
+    throw new FlowEndpointException(500, "Encryption failed");
+  }
+}
