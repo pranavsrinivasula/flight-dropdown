@@ -1,4 +1,7 @@
 // index.js
+require("dotenv").config(); // <--- MUST BE FIRST LINE
+console.log("✅ .env loaded");
+
 const express = require("express");
 const bodyParser = require("body-parser");
 const flightTypeRoutes = require("./Routes/routes");

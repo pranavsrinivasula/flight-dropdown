@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const fs = require("fs");
 
 class FlowEndpointException extends Error {
   constructor(statusCode, message) {
@@ -7,22 +8,32 @@ class FlowEndpointException extends Error {
   }
 }
 
-// Decrypt WhatsApp Flow request
-function decryptRequest(body, privatePem, passphrase) {
+// 1️⃣ Load private key once (from .env or file)
+let privatePem;
+if (process.env.PRIVATE_KEY) {
+  // If key is stored directly in .env, convert \n to real newlines
+  privatePem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n");
+  console.log("✅ Loaded private key from environment variable");
+} else if (process.env.PRIVATE_KEY_PATH) {
+  // Else load from path
+  privatePem = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
+  console.log("✅ Loaded private key from file:", process.env.PRIVATE_KEY_PATH);
+} else {
+  console.error("❌ Private key not found in environment");
+  throw new FlowEndpointException(500, "Private key missing on server");
+}
+
+// 2️⃣ Decrypt WhatsApp Flow request
+function decryptRequest(body) {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
   if (!encrypted_aes_key || !encrypted_flow_data || !initial_vector) {
     throw new FlowEndpointException(400, "Missing encryption fields in request");
   }
 
-  // Decrypt AES key using RSA private key
+  const passphrase = process.env.PRIVATE_KEY_PASSPHRASE;
   const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
-  let decryptedAesKey;
-if (process.env.PRIVATE_KEY) {
-  privatePem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n"); // convert \n to newlines
-} else {
-  privatePem = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
-}
 
+  let decryptedAesKey;
   try {
     decryptedAesKey = crypto.privateDecrypt(
       {
@@ -32,18 +43,12 @@ if (process.env.PRIVATE_KEY) {
       },
       Buffer.from(encrypted_aes_key, "base64")
     );
-    try {
-  envelopeBuffer = Buffer.from(body.encrypted_flow_data, "base64");
-} catch (err) {
-  console.warn("⚠️ Non-base64 payload received, treating as plain JSON for sandbox.");
-  return { aesKeyBuffer: null, initialVectorBuffer: null, decryptedBody: body };
-}
-
   } catch (error) {
+    console.error("❌ AES key decryption failed:", error.message);
     throw new FlowEndpointException(421, "Failed to decrypt AES key with private key");
   }
 
-  // Decrypt the actual payload using AES-GCM
+  // AES-GCM decryption
   const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
   const ivBuffer = Buffer.from(initial_vector, "base64");
   const tag = flowDataBuffer.subarray(-16);
@@ -59,11 +64,12 @@ if (process.env.PRIVATE_KEY) {
       ivBuffer,
     };
   } catch (error) {
+    console.error("❌ Payload AES decryption failed:", error.message);
     throw new FlowEndpointException(500, "Failed to decrypt AES payload");
   }
 }
 
-// Encrypt WhatsApp Flow response
+// 3️⃣ Encrypt WhatsApp Flow response
 function encryptResponse(responseBody, aesKeyBuffer, ivBuffer) {
   const flippedIv = Buffer.from(ivBuffer.map((b) => ~b));
   const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
