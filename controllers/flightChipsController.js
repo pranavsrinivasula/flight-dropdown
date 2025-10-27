@@ -4,9 +4,8 @@ const fs = require("fs");
 const path = require("path");
 
 let userFlightSelection = {};
-let privatePem;
 if (process.env.PRIVATE_KEY) {
-  privatePem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n"); // convert \n to newlines
+  privatePem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n")||process.env.PRIVATE_KEY_PATH; // convert \n to newlines
 } else {
   privatePem = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
 }
@@ -25,7 +24,7 @@ exports.handleFlightType = async (req, res) => {
       throw new FlowEndpointException(500, "Private key missing on server");
     }
 
-    const privatePem = fs.readFileSync(privateKeyPath, "utf8");
+    const privatePem = fs.readFileSync(privateKeyPath, "utf8")||process.env.PRIVATE_KEY_PATH;
     const passphrase = process.env.PRIVATE_KEY_PASSPHRASE || "";
 
     // 2️⃣ Try decrypting the request
