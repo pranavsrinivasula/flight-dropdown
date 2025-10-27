@@ -10,7 +10,7 @@ exports.handleFlightType = async (req, res) => {
     console.log("🚀 Incoming Request Body:", req.body);
 
     // 1️⃣ Load private key
-    const privateKeyPath = path.join(__dirname, "../keys/private.pem");
+    const privateKeyPath = process.env.PRIVATE_KEY;
     console.log("🔑 Looking for private key at:", privateKeyPath);
 
     if (!fs.existsSync(privateKeyPath)) {
