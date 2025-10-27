@@ -25,34 +25,35 @@ exports.handleFlightType = async (req, res) => {
       const Type_Flight_raw = payload.Type_Flight;
       const Type_Flight = Array.isArray(Type_Flight_raw) ? Type_Flight_raw[0] : Type_Flight_raw;
 
-      // Health check (no trigger)
+      // ✅ 1. Health check (no trigger) — keep as is
       if (!trigger) {
         const healthObj = { data: { status: "active" } };
         const enc = encryptResponse(healthObj, aesKeyBuffer, ivBuffer);
         return res.status(200).send(enc);
       }
 
-      // Validate trigger and flight type
+      // ✅ 2. When user selects a chip
       if (String(trigger).toLowerCase() !== "chipper") {
         const errorResponse = { success: false, message: "Invalid trigger received" };
         const enc = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
         return res.status(400).send(enc);
       }
 
-      if (!CHIP_OPTIONS.some((c) => c.id === String(Type_Flight))) {
+      // If user selected something invalid
+      if (Type_Flight && !CHIP_OPTIONS.some((c) => c.id === String(Type_Flight))) {
         const errorResponse = { success: false, message: "Invalid flight type selection" };
         const enc = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
         return res.status(400).send(enc);
       }
 
-      // ✅ Meta Flow-compliant response
+      // ✅ 3. Build response for Meta Flow
       const responseBody = {
         screen: {
           id: "FLIGHT_TYPE",
           title: "Flight Type Selection",
           data: {
             Flight_Type: {
-              value: String(Type_Flight),
+              value: Type_Flight ? String(Type_Flight) : "", // empty initially, filled after selection
             },
             chips: CHIP_OPTIONS.map((chip) => ({
               id: chip.id,
