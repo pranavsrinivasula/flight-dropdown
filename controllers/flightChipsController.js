@@ -1,4 +1,5 @@
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
+console.log("✅ encryption import check:", typeof decryptRequest);
 
 exports.handleFlightType = async (req, res) => {
   try {
