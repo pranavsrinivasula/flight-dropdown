@@ -1,4 +1,4 @@
-const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
+const { decryptRequest, encryptResponse, FlowEndpointException } = require("./middleware/encryption");
 
 let userFlightSelection = {};
 
