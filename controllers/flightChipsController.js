@@ -1,18 +1,17 @@
-// controllers/flightTypeController.js
 const { decryptRequest, encryptResponse } = require("../middleware/encryption");
 
 exports.handleFlightType = async (req, res) => {
   try {
-    // 🔹 Case 1: Encrypted WhatsApp request
+    // Case 1: Meta encrypted payload
     if (req.body.encrypted_flow_data) {
       const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
       const payload = decryptedBody.payload || {};
       const trigger = payload.trigger || null;
       const Type_Flight_raw = payload.Type_Flight;
 
-      // 🩺 Case 1A: Health check from Meta (no trigger)
+      // 🩺 Health check — happens when no trigger
       if (!trigger) {
-        const healthMessage = {
+        const responseBody = {
           response: {
             screen: {
               id: "HEALTH_CHECK",
@@ -24,16 +23,16 @@ exports.handleFlightType = async (req, res) => {
           },
         };
 
-        const encryptedResponse = encryptResponse(healthMessage, aesKeyBuffer, ivBuffer);
-        return res.status(200).send(encryptedResponse);
+        const encrypted = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+        return res.status(200).send(encrypted);
       }
 
-      // 🔹 Normalize flight type
+      // Normalize flight type
       const Type_Flight = Array.isArray(Type_Flight_raw)
         ? Type_Flight_raw[0]
         : Type_Flight_raw;
 
-      // 🔹 Validate trigger
+      // Validate trigger
       if (trigger.toLowerCase() !== "chipper") {
         const errorResponse = {
           response: {
@@ -44,17 +43,17 @@ exports.handleFlightType = async (req, res) => {
             },
           },
         };
-        const encryptedResponse = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
-        return res.status(400).send(encryptedResponse);
+        const encrypted = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
+        return res.status(400).send(encrypted);
       }
 
-      // 🔹 Define valid chips
+      // Define valid chips
       const chipOptions = [
         { id: "1", title: "One-Way" },
         { id: "2", title: "Return" },
       ];
 
-      // 🔹 Validate flight type
+      // Validate flight type
       if (!chipOptions.some((c) => c.id === Type_Flight)) {
         const errorResponse = {
           response: {
@@ -65,11 +64,11 @@ exports.handleFlightType = async (req, res) => {
             },
           },
         };
-        const encryptedResponse = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
-        return res.status(400).send(encryptedResponse);
+        const encrypted = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
+        return res.status(400).send(encrypted);
       }
 
-      // 🔹 Build chip data
+      // Build response
       const chips = chipOptions.map((chip) => ({
         id: chip.id,
         title: chip.title,
@@ -78,7 +77,6 @@ exports.handleFlightType = async (req, res) => {
         selectable: chip.id !== Type_Flight,
       }));
 
-      // 🔹 Proper WhatsApp Flow response structure
       const responseBody = {
         response: {
           screen: {
@@ -92,14 +90,19 @@ exports.handleFlightType = async (req, res) => {
         },
       };
 
-      const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
-      return res.status(200).send(encryptedResponse);
+      const encrypted = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+      return res.status(200).send(encrypted);
     }
 
-    // 🔹 Case 2: Plain Render/Manual Health check (non-encrypted)
+    // Case 2: Manual/Browser health check
     return res.status(200).json({
-      success: true,
-      message: "Plain health check OK (for manual or Render ping)",
+      response: {
+        screen: {
+          id: "HEALTH_CHECK",
+          title: "✅ Health Check OK",
+          data: { status: "active" },
+        },
+      },
     });
   } catch (error) {
     console.error("❌ Error in handleFlightType:", error);
