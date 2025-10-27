@@ -10,12 +10,11 @@ exports.handleFlightType = async (req, res) => {
       const trigger = payload.trigger || null;
       const Type_Flight_raw = payload.Type_Flight;
 
-      // 🩺 Health check from Meta (no trigger)
+      // 🩺 Case: Health check from Meta (no trigger)
       if (!trigger) {
-    const healthMessage = {
-  data: { status: "active" },
-};
-
+        const healthMessage = {
+          data: { status: "active" },
+        };
         const encryptedResponse = encryptResponse(healthMessage, aesKeyBuffer, ivBuffer);
         return res.status(200).send(encryptedResponse);
       }
@@ -54,12 +53,18 @@ exports.handleFlightType = async (req, res) => {
         selectable: chip.id !== Type_Flight,
       }));
 
+      // 🔹 WhatsApp Flow requires this structure (with "response.screen")
       const responseBody = {
-        success: true,
-        trigger,
-        selected_type: Type_Flight,
-        chips,
-        init_value: [Type_Flight],
+        response: {
+          screen: {
+            id: "FLIGHT_TYPE_SCREEN",
+            title: "✈️ Choose your flight type",
+            data: {
+              chips,
+              init_value: [Type_Flight],
+            },
+          },
+        },
       };
 
       const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
@@ -67,7 +72,7 @@ exports.handleFlightType = async (req, res) => {
     }
 
     // 🔹 Case 2: Plain Render/Manual Health check (non-encrypted)
-    // Meta won’t hit this; this is just for you to test in Postman.
+    // This is for Postman or Render testing only
     return res.status(200).json({
       success: true,
       message: "Plain health check OK (for manual or Render ping)",
