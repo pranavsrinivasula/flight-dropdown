@@ -1,49 +1,56 @@
 // controllers/flightTypeController.js
-const crypto = require("crypto");
 
-let userFlightSelection = {}; // in-memory storage
+/**
+ * Handles user chip selection for flight type (One-Way / Return)
+ */
+exports.handleFlightType = async (req, res) => {
+  try {
+    const { trigger, Type_Flight } = req.body;
 
-// Helper function to AES encrypt JSON
-function encryptAES(text, key) {
-    const iv = crypto.randomBytes(16); // generate random IV
-    const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(key, "hex"), iv);
-    let encrypted = cipher.update(JSON.stringify(text), "utf8", "base64");
-    encrypted += cipher.final("base64");
-
-    // return IV + encrypted text (both Base64)
-    return {
-        iv: iv.toString("base64"),
-        data: encrypted
-    };
-}
-
-exports.getChips = (req, res) => {
-    const { userId } = req.params;
-    const { selectedId, aesKey } = req.body; // aesKey should be 32 bytes in hex (256-bit)
-
-    if (!aesKey || aesKey.length !== 64) {
-        return res.status(400).json({ message: "Invalid AES key. Must be 32 bytes hex string." });
+    // ✅ Step 1: Validate trigger
+    if (trigger !== "chipper") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid trigger received",
+      });
     }
 
-    // Update selection if sent
-    if (selectedId && ["1", "2"].includes(selectedId)) {
-        userFlightSelection[userId] = selectedId;
+    // ✅ Step 2: Define valid chip options
+    const chipOptions = [
+      { id: "1", title: "One-Way" },
+      { id: "2", title: "Return" },
+    ];
+
+    // ✅ Step 3: Ensure valid selection
+    if (!chipOptions.some((c) => c.title === Type_Flight)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid flight type selection",
+      });
     }
 
-    const currentSelection = userFlightSelection[userId] || null;
+    // ✅ Step 4: Prepare response chips
+    const chips = chipOptions.map((chip) => ({
+      id: chip.id,
+      title: chip.title,
+      selected: chip.title === Type_Flight, // only selected one active
+      enabled: true,
+      selectable: chip.title !== Type_Flight, // others selectable
+    }));
 
-    // Prepare response
-    const responseObj = {
-        initValue: currentSelection,
-        dataSource: [
-            { id: "1", title: "One-Way", enabled: true },
-            { id: "2", title: "Return", enabled: true }
-        ],
-        maxSelectedItems: 1
-    };
-
-    // Encrypt response
-    const encrypted = encryptAES(responseObj, aesKey);
-
-    res.json(encrypted); // returns { iv: "...", data: "..." }
+    // ✅ Step 5: Return structured response for flow
+    return res.status(200).json({
+      success: true,
+      trigger,
+      selected_type: Type_Flight,
+      chips,
+      init_value: Type_Flight, // this becomes ${data.Flight_Type}
+    });
+  } catch (error) {
+    console.error("Error in handleFlightType:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
 };
