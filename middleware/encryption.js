@@ -26,6 +26,13 @@ function decryptRequest(body, privatePem, passphrase) {
       },
       Buffer.from(encrypted_aes_key, "base64")
     );
+    try {
+  envelopeBuffer = Buffer.from(body.encrypted_flow_data, "base64");
+} catch (err) {
+  console.warn("⚠️ Non-base64 payload received, treating as plain JSON for sandbox.");
+  return { aesKeyBuffer: null, initialVectorBuffer: null, decryptedBody: body };
+}
+
   } catch (error) {
     throw new FlowEndpointException(421, "Failed to decrypt AES key with private key");
   }
