@@ -71,7 +71,6 @@ function decryptRequest(body) {
 
 // 3️⃣ Encrypt WhatsApp Flow response
 function encryptResponse(responseBody, aesKeyBuffer, ivBuffer) {
-  const flippedIv = Buffer.from(ivBuffer.map((b) => ~b));
   const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
   const encrypted = Buffer.concat([
     cipher.update(JSON.stringify(responseBody), "utf-8"),
