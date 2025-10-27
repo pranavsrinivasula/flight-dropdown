@@ -1,41 +1,42 @@
+const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
+
 exports.handleFlightType = async (req, res) => {
   try {
     // Step 1: Decrypt incoming request
-    const { decryptedBody, aesKeyBuffer, initialVectorBuffer } = decryptRequest(
+    const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(
       req.body,
-      PRIVATE_KEY,
-      PASSPHRASE
+      process.env.PRIVATE_KEY,
+      process.env.PRIVATE_KEY_PASSPHRASE
     );
-    console.log("🟢 Decrypted body:", decryptedBody);
 
-    // Step 2: Extract user selection
-    const flowData = decryptedBody.data || decryptedBody || {};
-    const userSelectedType =
-      flowData?.Flight_Type?.[0] || flowData?.Type_Flight?.[0] || "";
+    console.log("✅ Decrypted body:", decryptedBody);
 
-    // Step 3: Prepare response payload
+    // Step 2: Extract user input
+    const flowData = decryptedBody.data || decryptedBody;
+    const selectedType = flowData?.Flight_Type?.[0] || flowData?.Type_Flight?.[0] || "";
+
+    // Step 3: Prepare response
     const responsePayload = {
       version: "7.1",
       data_api_version: "3.0",
       data: {
-        Flight_Type: userSelectedType ? [userSelectedType] : [],
-        is_Flying_To_enabled: !!userSelectedType,
+        Flight_Type: selectedType ? [selectedType] : [],
+        is_Flying_To_enabled: !!selectedType,
       },
       actions: [
         {
           name: "update_form",
           type: "update",
           data: {
-            Flight_Type: userSelectedType ? [userSelectedType] : [],
-            is_Flying_To_enabled: !!userSelectedType,
+            Flight_Type: selectedType ? [selectedType] : [],
+            is_Flying_To_enabled: !!selectedType,
           },
         },
       ],
     };
 
     // Step 4: Encrypt response
-    const encrypted = encryptResponse(responsePayload, aesKeyBuffer, initialVectorBuffer);
-    console.log("🔒 Encrypted response (Base64):", encrypted.slice(0, 80) + "...");
+    const encrypted = encryptResponse(responsePayload, aesKeyBuffer, ivBuffer);
 
     // Step 5: Send encrypted response
     res.status(200).json({ encrypted_flow_data: encrypted });
