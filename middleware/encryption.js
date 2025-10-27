@@ -17,6 +17,13 @@ function decryptRequest(body, privatePem, passphrase) {
   // Decrypt AES key using RSA private key
   const privateKey = crypto.createPrivateKey({ key: privatePem, passphrase });
   let decryptedAesKey;
+  let privatePem;
+if (process.env.PRIVATE_KEY) {
+  privatePem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n"); // convert \n to newlines
+} else {
+  privatePem = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
+}
+
   try {
     decryptedAesKey = crypto.privateDecrypt(
       {

@@ -4,6 +4,13 @@ const fs = require("fs");
 const path = require("path");
 
 let userFlightSelection = {};
+let privatePem;
+if (process.env.PRIVATE_KEY) {
+  privatePem = process.env.PRIVATE_KEY.replace(/\\n/g, "\n"); // convert \n to newlines
+} else {
+  privatePem = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
+}
+
 
 exports.handleFlightType = async (req, res) => {
   try {
