@@ -71,8 +71,45 @@ function decryptRequest(body) {
 }
 
 // 3️⃣ Encrypt WhatsApp Flow response (✅ fixed version)
+// inside middleware/encryption.js (after decryptRequest)
+function isBase64(str) {
+  try {
+    // attempt to decode and re-encode reliably
+    const decoded = Buffer.from(str, "base64");
+    // empty buffer is allowed but check that re-encoding matches (helps detect trailing junk)
+    return decoded.toString("base64") === str.replace(/\s+/g, "");
+  } catch (e) {
+    return false;
+  }
+}
+
+function validateAndLogEncryption(encryptedBase64, aesKeyBuffer, ivBuffer) {
+  // log sizes to debug mismatches
+  console.log("🔎 Encryption debug -> aesKey length:", aesKeyBuffer.length, "iv length:", ivBuffer.length);
+  // check base64 validity
+  if (!isBase64(encryptedBase64)) {
+    console.error("❌ encryptResponse produced invalid base64!");
+    // try more diagnostics: attempt Buffer.from to see error
+    try {
+      Buffer.from(encryptedBase64, "base64");
+      console.warn("⚠️ base64 decodes but normalized encoding mismatch");
+    } catch (err) {
+      console.error("❌ base64 decode error:", err.message);
+    }
+    // throw so caller doesn't send invalid body to WhatsApp
+    throw new Error("encryptResponse produced invalid base64 payload");
+  }
+  console.log("✅ encryptResponse result is valid base64 (len:", encryptedBase64.length, ")");
+}
+
+// the fixed encryptResponse
 function encryptResponse(responseBody, aesKeyBuffer, ivBuffer) {
-  // Use the same IV that came from request
+  // ensure key and iv are Buffers
+  if (!Buffer.isBuffer(aesKeyBuffer) || !Buffer.isBuffer(ivBuffer)) {
+    throw new Error("aesKeyBuffer and ivBuffer must be Buffers");
+  }
+
+  // use same ivBuffer (no flipping)
   const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, ivBuffer);
 
   const encrypted = Buffer.concat([
@@ -81,8 +118,16 @@ function encryptResponse(responseBody, aesKeyBuffer, ivBuffer) {
   ]);
 
   const tag = cipher.getAuthTag();
-  return Buffer.concat([encrypted, tag]).toString("base64");
+  const output = Buffer.concat([encrypted, tag]).toString("base64");
+
+  // validate before returning
+  validateAndLogEncryption(output, aesKeyBuffer, ivBuffer);
+
+  return output;
 }
+console.log("🔐 Decrypted AES key length:", aesKeyBuffer.length);
+console.log("🔐 IV length:", ivBuffer.length);
+
 
 module.exports = {
   decryptRequest,

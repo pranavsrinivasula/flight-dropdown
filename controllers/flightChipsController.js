@@ -14,7 +14,6 @@ exports.handleFlightType = async (req, res) => {
     const userId = decryptedBody?.user_id || "guest";
     let currentSelection = userFlightSelection[userId] || "";
 
-    // 2️⃣ When user selects a chip
     if (trigger === "chipper") {
       const selected = decryptedBody?.Type_Flight;
 
@@ -38,8 +37,6 @@ exports.handleFlightType = async (req, res) => {
       return res.status(200).json({ encrypted_flow_data: encryptedResponse });
     }
 
-    // 3️⃣ When there’s no trigger (initial ping etc.)
-    // Just return an empty flow response so WhatsApp continues
     const responseBody = {
       version: "1.0",
       data: {},

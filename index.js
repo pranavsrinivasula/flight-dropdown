@@ -1,19 +1,53 @@
-// index.js
-require("dotenv").config(); // <--- MUST BE FIRST LINE
-console.log("✅ .env loaded");
+const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
 
-const express = require("express");
-const bodyParser = require("body-parser");
-const flightTypeRoutes = require("./Routes/routes");
+let userFlightSelection = {};
 
-const app = express();
+exports.handleFlightType = async (req, res) => {
+  try {
+    console.log("🚀 Incoming Request Body:", req.body);
 
-app.use(bodyParser.json());
+    const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
+    console.log("✅ Decrypted Body:", decryptedBody);
 
-app.use("/", flightTypeRoutes);
+    const trigger = decryptedBody?.trigger;
+    const userId = decryptedBody?.user_id || "guest";
+    let currentSelection = userFlightSelection[userId] || "";
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+    // When user selects a chip -> respond with minimal update only
+    if (trigger === "chipper") {
+      const selected = decryptedBody?.Type_Flight;
+      if (selected && ["One-Way", "Return"].includes(selected)) {
+        userFlightSelection[userId] = selected;
+        currentSelection = selected;
+      }
+
+      const responseBody = {
+        version: "1.0",
+        data: {
+          action: {
+            type: "update",
+            message: `✅ Selected flight type: ${currentSelection}`,
+          },
+        },
+      };
+
+      const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+      console.log("🔐 Sending encrypted response (chipper) length:", encryptedResponse.length);
+      return res.status(200).json({ encrypted_flow_data: encryptedResponse });
+    }
+
+    // When there's no trigger (ping or others) -> keep it minimal (empty data)
+    const responseBody = {
+      version: "1.0",
+      data: {},
+    };
+
+    const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+    console.log("🔐 Sending encrypted response (no-trigger) length:", encryptedResponse.length);
+    res.status(200).json({ encrypted_flow_data: encryptedResponse });
+  } catch (error) {
+    console.error("❌ Error in handleFlightType:", error);
+    const status = error instanceof FlowEndpointException ? error.statusCode : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
