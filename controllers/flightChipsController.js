@@ -12,10 +12,10 @@ exports.handleFlightType = async (req, res) => {
 
       // 🩺 Health check from Meta (no trigger)
       if (!trigger) {
-        const healthMessage = {
-          success: true,
-          message: "✅ Health check OK — trigger not provided",
-        };
+    const healthMessage = {
+  data: { status: "active" },
+};
+
         const encryptedResponse = encryptResponse(healthMessage, aesKeyBuffer, ivBuffer);
         return res.status(200).send(encryptedResponse);
       }
