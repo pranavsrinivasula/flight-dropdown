@@ -1,114 +1,95 @@
-const { decryptRequest, encryptResponse } = require("../middleware/encryption");
+// controllers/flightTypeController.js
+const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
+const { isRequestSignatureValid } = require("../middleware/valid");
+const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "" } = process.env;
+
+const CHIP_OPTIONS = [
+  { id: "1", title: "One-Way" },
+  { id: "2", title: "Return" },
+];
 
 exports.handleFlightType = async (req, res) => {
   try {
-    // 🔹 Case 1: Encrypted Meta payload (from WhatsApp)
-    if (req.body.encrypted_flow_data) {
-      const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
-      const payload = decryptedBody.payload || {};
-      const trigger = payload.trigger || null;
-      const Type_Flight_raw = payload.Type_Flight;
-
-      // 🩺 Health check — happens when no trigger
-      if (!trigger) {
-        const responseBody = {
-          response: {
-            screen: {
-              id: "HEALTH_CHECK",
-              title: "✅ Health Check OK",
-              data: { status: "active" },
-            },
-          },
-        };
-
-        const encrypted = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
-        return res.status(200).send(encrypted);
-      }
-
-      // 🔹 Normalize flight type
-      const Type_Flight = Array.isArray(Type_Flight_raw)
-        ? Type_Flight_raw[0]
-        : Type_Flight_raw;
-
-      // 🔹 Validate trigger
-      if (trigger.toLowerCase() !== "chipper") {
-        const errorResponse = {
-          response: {
-            screen: {
-              id: "ERROR_SCREEN",
-              title: "⚠️ Invalid Trigger",
-              data: { message: "Invalid trigger received" },
-            },
-          },
-        };
-        const encrypted = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
-        return res.status(400).send(encrypted);
-      }
-
-      // 🔹 Define valid chips
-      const chipOptions = [
-        { id: "1", title: "One-Way" },
-        { id: "2", title: "Return" },
-      ];
-
-      // 🔹 Validate flight type
-      if (!chipOptions.some((c) => c.id === Type_Flight)) {
-        const errorResponse = {
-          response: {
-            screen: {
-              id: "ERROR_SCREEN",
-              title: "⚠️ Invalid Flight Type",
-              data: { message: "Invalid flight type selection" },
-            },
-          },
-        };
-        const encrypted = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
-        return res.status(400).send(encrypted);
-      }
-
-      // 🔹 Build chip data
-      const chips = chipOptions.map((chip) => ({
-        id: chip.id,
-        title: chip.title,
-        selected: chip.id === Type_Flight,
-        enabled: true,
-        selectable: chip.id !== Type_Flight,
-      }));
-
-      // 🔹 Build encrypted flow response
-      const responseBody = {
-        response: {
-          screen: {
-            id: "FLIGHT_TYPE_SCREEN",
-            title: "✈️ Choose your flight type",
-            data: {
-              chips,
-              init_value: [Type_Flight],
-            },
-          },
-        },
-      };
-
-      const encrypted = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
-      return res.status(200).send(encrypted);
+    // Optional signature check (keep or remove per your flow)
+    if (typeof isRequestSignatureValid === "function" && !isRequestSignatureValid(req)) {
+      console.warn("Request signature invalid");
+      return res.status(432).send();
     }
 
-    // 🔹 Case 2: Manual browser/Render health check (no encryption)
-    return res.status(200).json({
-      response: {
-        screen: {
-          id: "HEALTH_CHECK",
-          title: "✅ Health Check OK (Plain)",
-          data: { status: "active" },
-        },
-      },
-    });
+    // Path A: Encrypted Meta request (common)
+    if (req.body && req.body.encrypted_flow_data) {
+      let decrypted;
+      try {
+        // Use the same signature as your other endpoints (PRIVATE_KEY + PASSPHRASE)
+        decrypted = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
+      } catch (err) {
+        console.error("Failed to decrypt request:", err);
+        if (err instanceof FlowEndpointException) {
+          return res.status(err.statusCode).send();
+        }
+        return res.status(500).send();
+      }
 
-  } catch (error) {
-    console.error("❌ Error in handleFlightType:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
+      const { decryptedBody, aesKeyBuffer, ivBuffer } = decrypted;
+      console.log("Decrypted body:", JSON.stringify(decryptedBody));
+
+      const payload = decryptedBody.payload || {};
+      const trigger = typeof payload.trigger === "string" ? payload.trigger : null;
+      const Type_Flight_raw = payload.Type_Flight;
+
+      // Meta health check (no trigger) -> return encrypted status object
+      if (!trigger) {
+        const healthObj = { data: { status: "active" } };
+        const enc = encryptResponse(healthObj, aesKeyBuffer, ivBuffer);
+        return res.status(200).send(enc);
+      }
+
+      // Normalize Type_Flight (payload may be array or string)
+      const Type_Flight = Array.isArray(Type_Flight_raw) ? Type_Flight_raw[0] : Type_Flight_raw;
+
+      // Validate trigger safely
+      if (!trigger || String(trigger).toLowerCase() !== "chipper") {
+        const errorResponse = { success: false, message: "Invalid trigger received" };
+        const enc = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
+        return res.status(400).send(enc);
+      }
+
+      // Validate flight id
+      if (!CHIP_OPTIONS.some((c) => c.id === String(Type_Flight))) {
+        const errorResponse = { success: false, message: "Invalid flight type selection" };
+        const enc = encryptResponse(errorResponse, aesKeyBuffer, ivBuffer);
+        return res.status(400).send(enc);
+      }
+
+      // Build chips
+      const chips = CHIP_OPTIONS.map((chip) => ({
+        id: chip.id,
+        title: chip.title,
+        selected: chip.id === String(Type_Flight),
+        enabled: true,
+        selectable: chip.id !== String(Type_Flight),
+      }));
+
+      const responseBody = {
+        success: true,
+        trigger,
+        selected_type: String(Type_Flight),
+        chips,
+        init_value: [String(Type_Flight)],
+      };
+
+      const enc = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
+      return res.status(200).send(enc);
+    }
+
+    // Path B: Plain/manual health check (Postman / Render / local)
+    // This is useful for quick tests. Meta will not hit this branch.
+    return res.status(200).json({
+      success: true,
+      message: "Plain health check OK (for manual testing).",
     });
+  } catch (error) {
+    console.error("Error in handleFlightType:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
