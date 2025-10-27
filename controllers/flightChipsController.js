@@ -6,17 +6,18 @@ exports.handleFlightType = async (req, res) => {
     const trigger = payload.trigger || null;
     const Type_Flight_raw = payload.Type_Flight;
 
-    // 🩺 Handle health check
+    // 🩺 Handle health check (Render or Meta)
     if (!trigger) {
       const healthMessage = {
         success: true,
         message: "Health check OK — trigger not provided",
       };
 
-      // Encode as Base64
+      // Encode the JSON as Base64
       const encoded = Buffer.from(JSON.stringify(healthMessage)).toString("base64");
 
-      return res.status(200).send(encoded);
+      // ✅ Wrap Base64 string in a JSON object (what Meta expects)
+      return res.status(200).json({ body: encoded });
     }
 
     // Normalize Type_Flight
@@ -33,7 +34,7 @@ exports.handleFlightType = async (req, res) => {
       });
     }
 
-    // ✅ Define valid options
+    // ✅ Define valid chip options
     const chipOptions = [
       { id: "1", title: "One-Way" },
       { id: "2", title: "Return" },
@@ -47,7 +48,7 @@ exports.handleFlightType = async (req, res) => {
       });
     }
 
-    // ✅ Build chip data
+    // ✅ Build response chips
     const chips = chipOptions.map((chip) => ({
       id: chip.id,
       title: chip.title,
@@ -56,7 +57,7 @@ exports.handleFlightType = async (req, res) => {
       selectable: chip.id !== Type_Flight,
     }));
 
-    // ✅ Return structured JSON (normal)
+    // ✅ Return structured JSON during actual flow trigger
     return res.status(200).json({
       success: true,
       trigger,
