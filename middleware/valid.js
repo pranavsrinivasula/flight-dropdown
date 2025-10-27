@@ -1,25 +1,26 @@
-// controllers/flightTypeController.js
+const crypto = require("crypto");
 
-let userFlightSelection = {}; // in-memory store, no DB needed
-
-exports.getChips = (req, res) => {
-    const { userId } = req.params;
-    const { selectedId } = req.body || {};
-
-    // Update selection if user sent one
-    if (selectedId && ["1", "2"].includes(selectedId)) {
-        userFlightSelection[userId] = selectedId;
+function isRequestSignatureValid(req) {
+    const { APP_SECRET, PRIVATE_KEY, PASSPHRASE = "", } = process.env;
+    if (!APP_SECRET) {
+        console.warn("App Secret is not set up. Please Add your app secret in /.env file to check for request validation");
+        return true;
     }
 
-    const currentSelection = userFlightSelection[userId] || null;
+    const signatureHeader = req.get("x-hub-signature-256");
+    const signatureBuffer = Buffer.from(signatureHeader.replace("sha256=", ""), "utf-8");
 
-    // Respond with JSON
-    res.json({
-        initValue: currentSelection,
-        dataSource: [
-            { id: "1", title: "One-Way", enabled: true },
-            { id: "2", title: "Return", enabled: true }
-        ],
-        maxSelectedItems: 1 // only one selection allowed
-    });
-};
+    const hmac = crypto.createHmac("sha256", APP_SECRET);
+    const digestString = hmac.update(req.rawBody).digest('hex');
+    const digestBuffer = Buffer.from(digestString, "utf-8");
+
+    if (!crypto.timingSafeEqual(digestBuffer, signatureBuffer)) {
+        console.error("Error: Request Signature did not match");
+        return false;
+    }
+    return true;
+}
+
+module.exports = {
+    isRequestSignatureValid
+}
