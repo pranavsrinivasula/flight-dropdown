@@ -1,47 +1,58 @@
+// controller
 const { decryptRequest, encryptResponse, FlowEndpointException } = require("../middleware/encryption");
-
-let userFlightSelection = {};
 
 exports.handleFlightType = async (req, res) => {
   try {
-    console.log("🚀 Incoming Request Body:", req.body);
-
-    // 1️⃣ Decrypt
     const { decryptedBody, aesKeyBuffer, ivBuffer } = decryptRequest(req.body);
-    console.log("✅ Decrypted Body:", decryptedBody);
 
     const trigger = decryptedBody?.trigger;
     const userId = decryptedBody?.user_id || "guest";
-    let currentSelection = userFlightSelection[userId] || "";
+    let currentSelection = "";
 
     if (trigger === "chipper") {
       const selected = decryptedBody?.Type_Flight;
-
       if (selected && ["One-Way", "Return"].includes(selected)) {
-        userFlightSelection[userId] = selected;
         currentSelection = selected;
       }
-
-      // 🔹 Return only minimal action response (no full screen)
-      const responseBody = {
-        version: "1.0",
-        data: {
-          action: {
-            type: "update",
-            message: `✅ Selected flight type: ${currentSelection}`,
-          },
-        },
-      };
-
-      const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
-      return res.status(200).json({ encrypted_flow_data: encryptedResponse });
     }
 
-    const responseBody = {
-      version: "1.0",
-      data: {},
-    };
+    const responseBody = trigger
+      ? {
+          version: "1.0",
+          data: {
+            screens: [
+              {
+                id: "flight_type_screen",
+                title: "Flight Booking",
+                fields: [
+                  {
+                    type: "ChipsSelector",
+                    name: "Flight_Type",
+                    label: "🛫 Book Your Flight",
+                    description: "Choose where you want to fly from:",
+                    required: true,
+                    enabled: true,
+                    "init-value": currentSelection,
+                    "data-source": [
+                      { id: "1", title: "One-Way" },
+                      { id: "2", title: "Return" },
+                    ],
+                    "on-select-action": {
+                      name: "data_exchange",
+                      payload: {
+                        trigger: "chipper",
+                        Type_Flight: "${form.Flight_Type}",
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        }
+      : {}; // empty if no trigger
 
+    // 🧠 encrypt using same buffers
     const encryptedResponse = encryptResponse(responseBody, aesKeyBuffer, ivBuffer);
     res.status(200).json({ encrypted_flow_data: encryptedResponse });
   } catch (error) {
