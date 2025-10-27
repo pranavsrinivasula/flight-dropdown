@@ -1,5 +1,5 @@
-// controllers/flightTypeController.js
-const { decryptRequest, encryptResponse } = require("../cryptohelpers/decryptEncrypt");
+/// controllers/flightTypeController.js
+const { decryptRequest, encryptResponse } = require("../middleware/encryption");
 
 exports.handleFlightType = async (req, res) => {
   try {
