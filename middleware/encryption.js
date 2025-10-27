@@ -26,6 +26,7 @@ if (process.env.PRIVATE_KEY) {
 // 2️⃣ Decrypt WhatsApp Flow request
 function decryptRequest(body) {
   const { encrypted_aes_key, encrypted_flow_data, initial_vector } = body;
+
   if (!encrypted_aes_key || !encrypted_flow_data || !initial_vector) {
     throw new FlowEndpointException(400, "Missing encryption fields in request");
   }
@@ -69,13 +70,16 @@ function decryptRequest(body) {
   }
 }
 
-// 3️⃣ Encrypt WhatsApp Flow response
+// 3️⃣ Encrypt WhatsApp Flow response (✅ fixed version)
 function encryptResponse(responseBody, aesKeyBuffer, ivBuffer) {
-  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
+  // Use the same IV that came from request
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, ivBuffer);
+
   const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(responseBody), "utf-8"),
+    cipher.update(JSON.stringify(responseBody), "utf8"),
     cipher.final(),
   ]);
+
   const tag = cipher.getAuthTag();
   return Buffer.concat([encrypted, tag]).toString("base64");
 }
