@@ -74,22 +74,16 @@ if (action === "data_exchange" && trigger === "chipper") {
     : data?.Type_Flight;
 
   console.log("✈️ User selected chip:", selectedType);
-const currentSelection = Array.isArray(data?.Flight_Type)
-    ? data.Flight_Type[0]
-    : data?.Flight_Type;
 
-  const newSelection =
-    currentSelection === clickedType ? null : clickedType;
-
-  console.log("✅ Final selection:", newSelection);
   return {
     screen: "SEARCH",
     data: {
-      Flight_Type: newSelection ? [newSelection] : [],
-      From_enable: !!newSelection,  // optional: enable next step
+      Flight_Type: selectedType ? [selectedType] : [],
+      From_enable: true, // optional: enable next step
     },
   };
 }
+
 
 
 
