@@ -24,8 +24,7 @@ const flowWebhook = async (req, res) => {
     const screenResponse = await getNextScreen(decryptedBody);
     console.log("👉 Response to Encrypt:", screenResponse);
 
-const encrypted = encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer);
-res.json({ encrypted_flow_data: encrypted });
+    res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
   } catch (err) {
     console.error("❌ Error in flowWebhook:", err);
     res.status(500).json({ success: false, message: "Internal server error" });
@@ -33,7 +32,7 @@ res.json({ encrypted_flow_data: encrypted });
 };
 
 const getNextScreen = async (decryptedBody) => {
-  const { screen, action, data = {}, payload = {} } = decryptedBody;
+  const { screen, action, data = {}, flow_token, payload = {} } = decryptedBody;
   const trigger = payload?.trigger;
 
   if (action === "ping") return { data: { status: "active" } };
