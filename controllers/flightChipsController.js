@@ -42,14 +42,14 @@ const getNextScreen = async (decryptedBody) => {
     return { data: { acknowledged: true } };
   }
 
-  if (action === "INIT") {
-    return {
-      screen: "SEARCH",
-      data: {
-        Flight_Type: [],
-      },
-    };
-  }
+  // if (action === "INIT") {
+  //   return {
+  //     screen: "SEARCH",
+  //     data: {
+  //       Flight_Type: [],
+  //     },
+  //   };
+  // }
 
  if (action === "data_exchange" && trigger === "chipper") {
   const selectedType = data?.Flight_Type?.length
