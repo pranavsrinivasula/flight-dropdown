@@ -79,7 +79,6 @@ const getNextScreen = async (decryptedBody) => {
     return {
       screen: "SEARCH",
       data: {
-        ...data,
         Flight_Type: selectedType,
       },
     };
