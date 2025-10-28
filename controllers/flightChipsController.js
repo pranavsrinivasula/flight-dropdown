@@ -85,8 +85,8 @@ const currentSelection = Array.isArray(data?.Flight_Type)
   return {
     screen: "SEARCH",
     data: {
-      Flight_Type: selectedType ? [selectedType] : [],
-      From_enable: true, // optional: enable next step
+      Flight_Type: newSelection ? [newSelection] : [],
+      From_enable: !!newSelection,  // optional: enable next step
     },
   };
 }
