@@ -68,14 +68,17 @@ const getNextScreen = async (decryptedBody) => {
   }
 
 if (action === "data_exchange" && trigger === "chipper") {
-  // 1) Determine what the user clicked (prefer payload, then data)
+  // 1️⃣ Determine what the user clicked — take the LAST value (most recent chip)
   const clickedType =
-    Array.isArray(payload?.Type_Flight) ? payload.Type_Flight[0] :
-    payload?.Type_Flight ? payload.Type_Flight :
-    Array.isArray(data?.Type_Flight) ? data.Type_Flight[0] :
-    data?.Type_Flight;
+    Array.isArray(payload?.Type_Flight)
+      ? payload.Type_Flight[payload.Type_Flight.length - 1]
+      : payload?.Type_Flight
+      ? payload.Type_Flight
+      : Array.isArray(data?.Type_Flight)
+      ? data.Type_Flight[data.Type_Flight.length - 1]
+      : data?.Type_Flight;
 
-  // 2) Determine what was previously selected (if any)
+  // 2️⃣ Determine what was previously selected (if any)
   const previouslySelected =
     Array.isArray(data?.Flight_Type) && data.Flight_Type.length > 0
       ? data.Flight_Type[0]
@@ -83,17 +86,15 @@ if (action === "data_exchange" && trigger === "chipper") {
 
   console.log("✈️ clickedType:", clickedType, "previouslySelected:", previouslySelected);
 
-  // 3) Decide final selection (single-select behavior)
+  // 3️⃣ Allow only one selection at a time
   const newSelection = clickedType && clickedType !== previouslySelected ? clickedType : null;
 
-  console.log("✅ newSelection:", newSelection);
-
-  // 4) Return only the updated fields (avoid spreading old data)
+  // 4️⃣ Return clean data
   return {
     screen: "SEARCH",
     data: {
       Flight_Type: newSelection ? [newSelection] : [],
-      From_enable: !!newSelection, // optional: enable next input only when selected
+      From_enable: !!newSelection,
     },
   };
 }
