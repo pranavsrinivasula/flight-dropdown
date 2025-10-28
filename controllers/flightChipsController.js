@@ -84,20 +84,9 @@ if (action === "data_exchange" && trigger === "chipper") {
   return {
     screen: "SEARCH",
     data: {
-      // Preserve static data
       ...data,
-      Flight_Type: selectedType,
-
-      // Optional: reset dependent fields when chip changes
-      From_enable: false,
-      To_enable: false,
-      is_Flying_To_enabled: false,
-      is_To_enabled: false,
-      is_Search_To_enabled: false,
-      is_Departure_date_enabled: false,
-      is_Return_date_enabled: selectedType[0] === "2", // Only enable for return type
-      is_Advanced_options_enabled: false,
-      is_Book_enabled: false,
+      Type_Flight: selectedType,
+      Flight_Type:Type_Flight
     },
   };
 }
