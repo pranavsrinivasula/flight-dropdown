@@ -7,8 +7,6 @@ const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing in env.");
 
-    // if (!isRequestSignatureValid(req)) return res.status(432).send();
-
     let decryptedRequest;
     try {
       decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
@@ -33,65 +31,59 @@ const flowWebhook = async (req, res) => {
 
 const getNextScreen = async (decryptedBody) => {
   const { screen, action, data = {}, flow_token, payload = {} } = decryptedBody;
-  const trigger = payload?.trigger;
+  const trigger = data?.trigger || payload?.trigger;
 
-  if (action === "ping"){
-     return { data: { status: "active" } }
-  };
+  if (action === "ping") {
+    return { data: { status: "active" } };
+  }
 
   if (data?.error) {
     console.warn("⚠️ Client error:", data);
     return { data: { acknowledged: true } };
   }
 
-if (action === "INIT") {
-  return {
-    screen: "SEARCH",
-    data: {
-      Flight_Type: [], // initially empty (no chip selected)
-      From_enable: false,
-      To_enable: false,
-      is_Flying_To_enabled: false,
-      is_To_enabled: false,
-      is_Search_To_enabled: false,
-      is_Departure_date_enabled: false,
-      is_Return_date_enabled: false,
-      is_Advanced_options_enabled: false,
-      is_Book_enabled: false,
-      travellers: ["T1"],
-      cost_centre: "18166",
-      business_unit: "2306",
-      min_date: "2025-07-07",
-      Preferred_class_data: [
-        { id: "1", title: "Economy" },
-      ],
-      Flying_from_data: [],
-      Flying_to_data: [],
-    },
-  };
-}
+  if (action === "INIT") {
+    return {
+      screen: "SEARCH",
+      data: {
+        Flight_Type: [],
+        From_enable: false,
+        To_enable: false,
+        is_Flying_To_enabled: false,
+        is_To_enabled: false,
+        is_Search_To_enabled: false,
+        is_Departure_date_enabled: false,
+        is_Return_date_enabled: false,
+        is_Advanced_options_enabled: false,
+        is_Book_enabled: false,
+        travellers: ["T1"],
+        cost_centre: "18166",
+        business_unit: "2306",
+        min_date: "2025-07-07",
+        Preferred_class_data: [{ id: "1", title: "Economy" }],
+        Flying_from_data: [],
+        Flying_to_data: [],
+      },
+    };
+  }
 
+  if (action === "data_exchange" && trigger === "chipper") {
+    const selectedType = Array.isArray(data?.Type_Flight)
+      ? data.Type_Flight
+      : data?.Type_Flight
+      ? [data.Type_Flight]
+      : [];
 
-if (action === "data_exchange" && trigger === "chipper") {
-  const selectedType = Array.isArray(payload?.Type_Flight)
-    ? payload.Type_Flight
-    : payload?.Type_Flight
-    ? [payload.Type_Flight]
-    : [];
+    console.log("✈️ User selected chip:", selectedType);
 
-  console.log("✈️ User selected chip:", selectedType);
-
-  return {
-    screen: "SEARCH",
-    data: {
-      ...data,
-      Type_Flight: selectedType,
-      Flight_Type:Type_Flight
-    },
-  };
-}
-
-
+    return {
+      screen: "SEARCH",
+      data: {
+        ...data,
+        Flight_Type: selectedType,
+      },
+    };
+  }
 
   throw new Error("Unhandled endpoint request for this screen/action.");
 };
