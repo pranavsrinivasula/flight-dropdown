@@ -44,14 +44,33 @@ const getNextScreen = async (decryptedBody) => {
     return { data: { acknowledged: true } };
   }
 
-  if (action === "INIT") {
-    return {
-        ...data,
-        data: {
-        Flight_Type: [],
-      },
-    };
-  }
+if (action === "INIT") {
+  return {
+    screen: "SEARCH",
+    data: {
+      Flight_Type: [], // initially empty (no chip selected)
+      From_enable: false,
+      To_enable: false,
+      is_Flying_To_enabled: false,
+      is_To_enabled: false,
+      is_Search_To_enabled: false,
+      is_Departure_date_enabled: false,
+      is_Return_date_enabled: false,
+      is_Advanced_options_enabled: false,
+      is_Book_enabled: false,
+      travellers: ["T1"],
+      cost_centre: "18166",
+      business_unit: "2306",
+      min_date: "2025-07-07",
+      Preferred_class_data: [
+        { id: "1", title: "Economy" },
+      ],
+      Flying_from_data: [],
+      Flying_to_data: [],
+    },
+  };
+}
+
 
  if (action === "data_exchange" && trigger === "chipper") {
   const selectedType = data?.Flight_Type?.length
