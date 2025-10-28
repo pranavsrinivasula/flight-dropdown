@@ -48,31 +48,6 @@ const getNextScreen = async (decryptedBody) => {
       data: {
         Flight_Type: [], // init empty
       },
-      layout: {
-        type: "SingleColumnLayout",
-        children: [
-          {
-            type: "ChipsSelector",
-            name: "Flight_Type",
-            label: "🛫 Book Your Flight",
-            description: "Choose where you want to fly from to begin your booking:",
-            required: true,
-            enabled: true,
-            "init-value": [], // initially empty
-            "data-source": [
-              { id: "2", title: "Return" },
-              { id: "1", title: "One-Way" },
-            ],
-            "on-select-action": {
-              name: "data_exchange",
-              payload: {
-                trigger: "chipper",
-                Type_Flight: "${form.Flight_Type}",
-              },
-            },
-          },
-        ],
-      },
     };
   }
 
@@ -91,31 +66,6 @@ const getNextScreen = async (decryptedBody) => {
     screen: "SEARCH",
     data: {
       Flight_Type: selectedType, // store selected chip
-    },
-    layout: {
-      type: "SingleColumnLayout",
-      children: [
-        {
-          type: "ChipsSelector",
-          name: "Flight_Type",
-          label: "🛫 Book Your Flight",
-          description: "Choose where you want to fly from to begin your booking:",
-          required: true,
-          enabled: true,
-          "init-value": selectedType, // preselect user’s choice
-          "data-source": [
-            { id: "2", title: "Return" },
-            { id: "1", title: "One-Way" },
-          ],
-          "on-select-action": {
-            name: "data_exchange",
-            payload: {
-              trigger: "chipper",
-              Type_Flight: "${form.Flight_Type}",
-            },
-          },
-        },
-      ],
     },
   };
 }
