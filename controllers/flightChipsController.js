@@ -46,7 +46,7 @@ const getNextScreen = async (decryptedBody) => {
 
   if (action === "INIT") {
     return {
-  ...SCREEN_RESPONSES.SEARCH,
+        ...data,
         data: {
         Flight_Type: [],
       },
