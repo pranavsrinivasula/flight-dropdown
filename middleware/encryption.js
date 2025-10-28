@@ -61,16 +61,17 @@ const encryptResponse = (
   initialVectorBuffer
 ) => {
   // flip initial vector
-  const flipped_iv = [];
-  for (const pair of initialVectorBuffer.entries()) {
-    flipped_iv.push(~pair[1]);
-  }
+  // const flipped_iv = [];
+  // for (const pair of initialVectorBuffer.entries()) {
+  //   flipped_iv.push(~pair[1]);
+  // }
+const flipped_iv = Buffer.from(initialVectorBuffer.map(byte => byte ^ 0xff));
 
   // encrypt response data
   const cipher = crypto.createCipheriv(
     "aes-128-gcm",
     aesKeyBuffer,
-    Buffer.from(flipped_iv)
+  flipped_iv
   );
   return Buffer.concat([
     cipher.update(JSON.stringify(response), "utf-8"),

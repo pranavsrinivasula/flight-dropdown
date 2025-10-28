@@ -32,7 +32,7 @@ const flowWebhook = async (req, res) => {
 };
 
 const getNextScreen = async (decryptedBody) => {
-  const { screen, action, data = {}, flow_token, payload = {} } = decryptedBody;
+  const { screen, action, data = {}, payload = {} } = decryptedBody;
   const trigger = payload?.trigger;
 
   if (action === "ping") return { data: { status: "active" } };
