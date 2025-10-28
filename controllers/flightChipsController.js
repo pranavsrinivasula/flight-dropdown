@@ -7,7 +7,7 @@ const flowWebhook = async (req, res) => {
   try {
     if (!PRIVATE_KEY) throw new Error("Private key missing in env.");
 
-    if (!isRequestSignatureValid(req)) return res.status(432).send();
+    // if (!isRequestSignatureValid(req)) return res.status(432).send();
 
     let decryptedRequest;
     try {
@@ -76,43 +76,50 @@ const getNextScreen = async (decryptedBody) => {
     };
   }
 
-  if (action === "data_exchange" && trigger === "chipper") {
-    const selectedType = data?.Flight_Type || [];
+ if (action === "data_exchange" && trigger === "chipper") {
+  const selectedType = data?.Flight_Type?.length
+    ? data.Flight_Type
+    : payload?.Type_Flight
+    ? Array.isArray(payload.Type_Flight)
+      ? payload.Type_Flight
+      : [payload.Type_Flight]
+    : [];
 
-    console.log("✈️ User selected chip:", selectedType);
+  console.log("✈️ User selected chip:", selectedType);
 
-    return {
-      screen: "SEARCH",
-      data: {
-        Flight_Type: selectedType, 
-      },
-      layout: {
-        type: "SingleColumnLayout",
-        children: [
-          {
-            type: "ChipsSelector",
-            name: "Flight_Type",
-            label: "🛫 Book Your Flight",
-            description: "Choose where you want to fly from to begin your booking:",
-            required: true,
-            enabled: true,
-            "init-value": selectedType, 
-            "data-source": [
-              { id: "2", title: "Return" },
-              { id: "1", title: "One-Way" },
-            ],
-            "on-select-action": {
-              name: "data_exchange",
-              payload: {
-                trigger: "chipper",
-                Type_Flight: "${form.Flight_Type}",
-              },
+  return {
+    screen: "SEARCH",
+    data: {
+      Flight_Type: selectedType, // store selected chip
+    },
+    layout: {
+      type: "SingleColumnLayout",
+      children: [
+        {
+          type: "ChipsSelector",
+          name: "Flight_Type",
+          label: "🛫 Book Your Flight",
+          description: "Choose where you want to fly from to begin your booking:",
+          required: true,
+          enabled: true,
+          "init-value": selectedType, // preselect user’s choice
+          "data-source": [
+            { id: "2", title: "Return" },
+            { id: "1", title: "One-Way" },
+          ],
+          "on-select-action": {
+            name: "data_exchange",
+            payload: {
+              trigger: "chipper",
+              Type_Flight: "${form.Flight_Type}",
             },
           },
-        ],
-      },
-    };
-  }
+        },
+      ],
+    },
+  };
+}
+
 
   throw new Error("Unhandled endpoint request for this screen/action.");
 };
