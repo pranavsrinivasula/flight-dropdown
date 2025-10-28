@@ -35,21 +35,23 @@ const getNextScreen = async (decryptedBody) => {
   const { screen, action, data = {}, flow_token, payload = {} } = decryptedBody;
   const trigger = payload?.trigger;
 
-  if (action === "ping") return { data: { status: "active" } };
+  if (action === "ping"){
+     return { data: { status: "active" } }
+  };
 
   if (data?.error) {
     console.warn("⚠️ Client error:", data);
     return { data: { acknowledged: true } };
   }
 
-  // if (action === "INIT") {
-  //   return {
-  //     screen: "SEARCH",
-  //     data: {
-  //       Flight_Type: [],
-  //     },
-  //   };
-  // }
+  if (action === "INIT") {
+    return {
+  ...SCREEN_RESPONSES.SEARCH,
+        data: {
+        Flight_Type: [],
+      },
+    };
+  }
 
  if (action === "data_exchange" && trigger === "chipper") {
   const selectedType = data?.Flight_Type?.length
@@ -65,6 +67,7 @@ const getNextScreen = async (decryptedBody) => {
   return {
     screen: "SEARCH",
     data: {
+        ...data,
         Flight_Type: selectedType,
        },
   };
