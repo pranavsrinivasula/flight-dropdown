@@ -55,29 +55,17 @@ const decryptRequest = (body, privatePem, passphrase) => {
   };
 };
 
-const encryptResponse = (
-  response,
-  aesKeyBuffer,
-  initialVectorBuffer
-) => {
-  // flip initial vector
-  // const flipped_iv = [];
-  // for (const pair of initialVectorBuffer.entries()) {
-  //   flipped_iv.push(~pair[1]);
-  // }
-const flipped_iv = Buffer.from(initialVectorBuffer.map(byte => byte ^ 0xff));
+const encryptResponse = (response, aesKeyBuffer, initialVectorBuffer) => {
+  const flipped_iv = Buffer.from(initialVectorBuffer.map(byte => byte ^ 0xff));
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flipped_iv);
 
-  // encrypt response data
-  const cipher = crypto.createCipheriv(
-    "aes-128-gcm",
-    aesKeyBuffer,
-  flipped_iv
-  );
-  return Buffer.concat([
-    cipher.update(JSON.stringify(response), "utf-8"),
+  const ciphertext = Buffer.concat([
+    cipher.update(JSON.stringify(response), "utf8"),
     cipher.final(),
-    cipher.getAuthTag(),
-  ]).toString("base64");
+  ]);
+  const authTag = cipher.getAuthTag();
+
+  return Buffer.concat([ciphertext, authTag]).toString("base64");
 };
 
 const FlowEndpointException = class FlowEndpointException extends Error {
