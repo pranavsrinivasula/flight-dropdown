@@ -72,13 +72,11 @@ if (action === "INIT") {
 }
 
 
- if (action === "data_exchange" && trigger === "chipper") {
-  const selectedType = data?.Flight_Type?.length
-    ? data.Flight_Type
+if (action === "data_exchange" && trigger === "chipper") {
+  const selectedType = Array.isArray(payload?.Type_Flight)
+    ? payload.Type_Flight
     : payload?.Type_Flight
-    ? Array.isArray(payload.Type_Flight)
-      ? payload.Type_Flight
-      : [payload.Type_Flight]
+    ? [payload.Type_Flight]
     : [];
 
   console.log("✈️ User selected chip:", selectedType);
@@ -86,11 +84,24 @@ if (action === "INIT") {
   return {
     screen: "SEARCH",
     data: {
-        ...data,
-        Flight_Type: selectedType,
-       },
+      // Preserve static data
+      ...data,
+      Flight_Type: selectedType,
+
+      // Optional: reset dependent fields when chip changes
+      From_enable: false,
+      To_enable: false,
+      is_Flying_To_enabled: false,
+      is_To_enabled: false,
+      is_Search_To_enabled: false,
+      is_Departure_date_enabled: false,
+      is_Return_date_enabled: selectedType[0] === "2", // Only enable for return type
+      is_Advanced_options_enabled: false,
+      is_Book_enabled: false,
+    },
   };
 }
+
 
 
   throw new Error("Unhandled endpoint request for this screen/action.");
