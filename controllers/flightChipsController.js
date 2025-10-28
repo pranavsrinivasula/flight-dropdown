@@ -46,7 +46,11 @@ const getNextScreen = async (decryptedBody) => {
     return {
       screen: "SEARCH",
       data: {
-        Flight_Type: [], // init empty
+        Flight_Type: [],
+        available_flights: [
+        { id: "1", title: "One-Way" },
+        { id: "2", title: "Return" },
+        ] // init empty
       },
     };
   }
@@ -65,8 +69,12 @@ const getNextScreen = async (decryptedBody) => {
   return {
     screen: "SEARCH",
     data: {
-      Flight_Type: selectedType, // store selected chip
-    },
+ Flight_Type: selectedType,
+      available_flights: [
+        { id: "1", title: "One-Way" },
+        { id: "2", title: "Return" },  
+      ] 
+       },
   };
 }
 
