@@ -67,21 +67,24 @@ const getNextScreen = async (decryptedBody) => {
     };
   }
 
-  if (action === "data_exchange" && trigger === "chipper") {
-    const selectedType = Array.isArray(data?.Type_Flight)
+if (action === "data_exchange" && trigger === "chipper") {
+  // pick selected flight type
+  const selectedType = Array.isArray(data?.Type_Flight)
     ? data.Type_Flight[0]   // take only the first one
     : data?.Type_Flight;
 
-    console.log("✈️ User selected chip:", selectedType);
+  console.log("✈️ User selected chip:", selectedType);
 
-    return {
-      screen: "SEARCH",
-      data: {
- Flight_Type: selectedValue ? [selectedValue] : [],
+  return {
+    screen: "SEARCH",
+    data: {
+      Flight_Type: selectedType ? [selectedType] : [],
       From_enable: true, // optional: enable next step
-      },
-    };
-  }
+    },
+  };
+}
+
+
 
   throw new Error("Unhandled endpoint request for this screen/action.");
 };
