@@ -68,21 +68,42 @@ const getNextScreen = async (decryptedBody) => {
   }
 
 if (action === "data_exchange" && trigger === "chipper") {
-  // pick selected flight type
-  const selectedType = Array.isArray(data?.Type_Flight)
-    ? data.Type_Flight[0]   // take only the first one
+  // The chip user just clicked
+  const clickedType = Array.isArray(data?.Type_Flight)
+    ? data.Type_Flight[0]
     : data?.Type_Flight;
 
-  console.log("✈️ User selected chip:", selectedType);
+  // The chip that was selected previously (before this click)
+  const previouslySelected =
+    Array.isArray(data?.Flight_Type) && data.Flight_Type.length > 0
+      ? data.Flight_Type[0]
+      : null;
+
+  console.log("✈️ Clicked chip:", clickedType);
+  console.log("💾 Previously selected chip:", previouslySelected);
+
+  // Decide what the new selection should be
+  let newSelection = null;
+
+  if (previouslySelected === clickedType) {
+    // If the same chip is clicked again → deselect
+    newSelection = null;
+  } else {
+    // If a different chip is clicked → replace old with new
+    newSelection = clickedType;
+  }
+
+  console.log("✅ Final selection:", newSelection);
 
   return {
     screen: "SEARCH",
     data: {
-      Flight_Type: selectedType ? [selectedType] : [],
-      From_enable: true, // optional: enable next step
+      Flight_Type: newSelection ? [newSelection] : [],
+      From_enable: !!newSelection, // Enable next step only if selected
     },
   };
 }
+
 
 
 
